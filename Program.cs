@@ -1,5 +1,5 @@
 ﻿using IngameScript.Utils;
-using Sandbox.Game.GameSystems;
+using Sandbox.Game.Entities.Interfaces;
 using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
@@ -105,7 +105,9 @@ namespace IngameScript
             {
                 GAUCommand = GAUTempCommand;
                 GAUTempCommand = GAUCommandEnum.NULL;
-            } else if (GAUTempCommand == GAUCommandEnum.FIRE)
+            } else if (GAUTempCommand == GAUCommandEnum.FIRE ||
+                GAUTempCommand == GAUCommandEnum.EXHAUST ||
+                GAUTempCommand == GAUCommandEnum.EXHAUSTON)
             {
                 GAUTempCommand = GAUCommandEnum.NULL;
             }
@@ -148,12 +150,12 @@ namespace IngameScript
                     break;
 
                 case GAUCommandEnum.EXHAUST:
-                    exhaust.ExhaustEffect("run");
+                    exhaust.ExhaustReset();
                     GAUCommand = GAUCommandEnum.EXHAUSTON;
                     break;
 
                 case GAUCommandEnum.EXHAUSTON:
-                    if (exhaust.ExhaustEffect(""))
+                    if (exhaust.ExhaustEffect())
                     {
                         GAUCommand = GAUCommandEnum.FIRE;
                     }
@@ -347,14 +349,29 @@ namespace IngameScript
 
         private bool IsAlmostCharged()
         {
-            if (IsBlockMissing(railgunReloadCheck))
-            {
-                GAUCommand = GAUCommandEnum.RESET;
-                return false;
-            }
+            bool result = false;
 
-            if (railgunReloadCheck.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED))
+            if (!IsBlockMissing(railgunReloadCheck))
             {
+                if (railgunReloadCheck.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED))
+                {
+                    return IsRailgunAlmostCharged(railgunReloadCheck);
+                }
+            } else
+            {
+                foreach (IMySmallMissileLauncherReload railgun in railgunBlockList)
+                {
+                    result = IsRailgunAlmostCharged(railgun);
+                }
+            }
+            return result;
+        }
+
+        private bool IsRailgunAlmostCharged(IMySmallMissileLauncherReload railgun)
+        {
+            if (railgun.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED))
+            {
+                railgunReloadCheck.Enabled = false;
                 GAUCommand = GAUCommandEnum.ALMOSTCHARGED;
                 return true;
             }
@@ -505,7 +522,7 @@ namespace IngameScript
         private bool IsBlockMissing<T>(T blockT)
         {
             IMyTerminalBlock block = (IMyTerminalBlock)blockT;
-            return block == null || block.Closed == true || !block.IsFunctional == true;
+            return block == null || block.Closed || block.IsFunctional != true;
         }
 
         private static void ShootRailgun(IMySmallMissileLauncherReload railgun)

@@ -76,15 +76,14 @@ namespace IngameScript
             tickCounter = 0;
         }
 
-        public bool ExhaustEffect(string arg)
+        public void ExhaustReset()
         {
-            if (arg != null && arg.ToLower() == "run")
-            {
-                state = 0;
-                tickCounter = 0;
-                return false;
-            }
-            
+            state = 0;
+            tickCounter = 0;
+        }
+
+        public bool ExhaustEffect()
+        {
             // === TURNING ON ===
             if (state < exhaustLists.Count)
             {
@@ -94,6 +93,7 @@ namespace IngameScript
                     state++;
                     tickCounter = 0;
                 }
+                tickCounter++;
             }
 
             return state >= exhaustLists.Count;
