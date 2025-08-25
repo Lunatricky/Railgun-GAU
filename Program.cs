@@ -113,7 +113,8 @@ namespace IngameScript
             }
 
 
-            if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST || GAUCommand == GAUCommandEnum.EXHAUSTON)
+            if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST || 
+                GAUCommand == GAUCommandEnum.EXHAUSTON || GAUCommand == GAUCommandEnum.CHARGING)
             {
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
             }
@@ -203,6 +204,7 @@ namespace IngameScript
                         railgunReloadCheck = null;
                         OpenDoors();
                         ToggleBlocks(true, rotorBlockList);
+                        GAUCommand = GAUCommandEnum.ALMOSTCHARGED;
                     }
                     break;
                 case GAUCommandEnum.ALMOSTCHARGED:
@@ -307,7 +309,6 @@ namespace IngameScript
 
             if (tempRailgunListShootSalvo.Count == 0)
             {
-                //GAUCommand = (GAUCommand == GAUCommandEnum.FIRE? GAUCommandEnum.CHARGE : GAUCommandEnum.EXHAUSTOFF);
                 GAUCommand = GAUCommandEnum.CHARGE;
                 exhaust.ExhaustOff();
             }
@@ -353,29 +354,15 @@ namespace IngameScript
 
             if (!IsBlockMissing(railgunReloadCheck))
             {
-                if (railgunReloadCheck.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED))
-                {
-                    return IsRailgunAlmostCharged(railgunReloadCheck);
-                }
+                return railgunReloadCheck.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED);
             } else
             {
                 foreach (IMySmallMissileLauncherReload railgun in railgunBlockList)
                 {
-                    result = IsRailgunAlmostCharged(railgun);
+                    result = railgun.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED);
                 }
             }
             return result;
-        }
-
-        private bool IsRailgunAlmostCharged(IMySmallMissileLauncherReload railgun)
-        {
-            if (railgun.DetailedInfo.Contains(RailgunChargeStateEnum.CHARGED))
-            {
-                railgunReloadCheck.Enabled = false;
-                GAUCommand = GAUCommandEnum.ALMOSTCHARGED;
-                return true;
-            }
-            return false;
         }
 
         private static int CheckCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
