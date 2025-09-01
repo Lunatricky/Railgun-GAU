@@ -92,8 +92,10 @@ namespace IngameScript
                     exhaustLists[state].ForEach(exhaust => exhaust.Enabled = true);
                     state++;
                     tickCounter = 0;
+                } else
+                {
+                    tickCounter++;
                 }
-                tickCounter++;
             }
 
             return state >= exhaustLists.Count;

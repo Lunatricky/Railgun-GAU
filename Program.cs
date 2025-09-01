@@ -1,5 +1,4 @@
 ﻿using IngameScript.Utils;
-using Sandbox.Game.Entities.Interfaces;
 using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
@@ -22,6 +21,8 @@ namespace IngameScript
 
         private const float shootTimeLG = 2.00f;
         private const float shootTimeSG = 0.50f;
+
+        private float fireDelay;
 
         // Configurable variables
         private float shootDelay;  // Shooting delay in seconds
@@ -384,7 +385,7 @@ namespace IngameScript
 
         private bool IsDoorOpen()
         {
-            foreach (IMyAirtightHangarDoor door in doorBlockList)
+            foreach (IMyDoor door in doorBlockList)
             {
                 if (IsBlockMissing(door) && door.Status != DoorStatus.Open)
                 {
@@ -460,6 +461,7 @@ namespace IngameScript
             RailgunChargeStateEnum.ALMOST = (isLG ? RailgunChargeStateEnumLG.ALMOST : RailgunChargeStateEnumSG.ALMOST);
             shootDelay = (isLG ? shootTimeLG : shootTimeSG);
             rotationAngle = (isLG ? rotationAngleLG : rotationAngleSG);
+            fireDelay = shootDelay * 60;
 
             originPlaneAngleOffset = ShootDelayOffsetAngle();
         }
