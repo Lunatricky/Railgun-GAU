@@ -174,7 +174,6 @@ namespace IngameScript
                     {
                         RailgunShootSalvo();
                     }
-                    GAUCommand = GAUCommandEnum.EXHAUSTON;
                     break;
 
                 case GAUCommandEnum.FIRE:
