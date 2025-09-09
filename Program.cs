@@ -22,7 +22,6 @@ namespace IngameScript
         private const float shootTimeLG = 2.00f;
         private const float shootTimeSG = 0.50f;
 
-        private float fireDelay;
 
         // Configurable variables
         private float shootDelay;  // Shooting delay in seconds
@@ -67,12 +66,12 @@ namespace IngameScript
 
         private IMyTerminalBlock reference;
         private readonly List<List<IMyFunctionalBlock>> exhaustLists = new List<List<IMyFunctionalBlock>>();
+
         private int state = 0;          // Which step we're on
         private int tickCounter = 0;    // Delay counter
 
-        private float exhaustStep = 2;
         private float exhaustEffectTicks;
-        private float fireTick;
+        private float fireDelay;
 
         public Program()
         {
@@ -85,6 +84,8 @@ namespace IngameScript
         {
             Echo($"Cycle: {GAUCommand}");
             Echo($"{startString}");
+            Echo($"exhaustEffectTicks : {exhaustEffectTicks}");
+            Echo($"fireDelay : {fireDelay}");
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
@@ -166,13 +167,19 @@ namespace IngameScript
                     break;
 
                 case GAUCommandEnum.EXHAUST:
-                    if (exhaustEffectTicks > 0) {
-                        exhaustEffectTicks--;
-                        ExhaustReset();
-                    }
-                    if (fireTick >= exhaustEffectTicks)
+                    ExhaustReset();
+                    GAUCommand = GAUCommandEnum.EXHAUSTON;
+                    break;
+
+                case GAUCommandEnum.EXHAUSTON:
+                    if (fireDelay >= exhaustEffectTicks)
                     {
                         RailgunShootSalvo();
+                    }
+                    if (exhaustEffectTicks > 0)
+                    {
+                        exhaustEffectTicks--;
+                        ExhaustEffect();
                     }
                     break;
 
@@ -235,6 +242,9 @@ namespace IngameScript
                     {
                         GAUCommand = GAUCommandEnum.CHARGE;
                         hasRecompiled = false;
+                    } else
+                    {
+                        ToggleBlocks(false, railgunBlockList);
                     }
                     break;
             }
@@ -325,16 +335,10 @@ namespace IngameScript
             {
                 GAUCommand = GAUCommandEnum.CHARGE;
                 ExhaustOff();
-                exhaustEffectTicks = exhaustStep * exhaustLists.Count / 2;
             }
         }
 
         private bool IsCharged()
-        {
-            return IsCharged(1f);
-        }
-
-        private bool IsCharged(float percentage)
         {
             bool isCharged = false;
             int chargedCounter = 0;
@@ -355,7 +359,7 @@ namespace IngameScript
                 }
             }
 
-            if (chargedCounter >= percentage * tempRailgunListIsCharged.Count)
+            if (tempRailgunListIsCharged.Count == 0)
             {
                 isCharged = true;
             }
@@ -475,12 +479,10 @@ namespace IngameScript
             RailgunChargeStateEnum.ALMOST = (isLG ? RailgunChargeStateEnumLG.ALMOST : RailgunChargeStateEnumSG.ALMOST);
             shootDelay = (isLG ? shootTimeLG : shootTimeSG);
             rotationAngle = (isLG ? rotationAngleLG : rotationAngleSG);
-            fireDelay = shootDelay * 60;
 
             originPlaneAngleOffset = ShootDelayOffsetAngle();
-
-            exhaustEffectTicks = exhaustStep * exhaustLists.Count / 2;
-            fireTick = shootDelay * 60;
+            fireDelay = shootDelay * 60;
+            ExhaustReset();
         }
 
         private void ConfigureGAURotors(IMyMotorStator motorStator, float torque, float targetVelocityRPM)
@@ -697,9 +699,10 @@ namespace IngameScript
         {
             state = 0;
             tickCounter = 0;
+            exhaustEffectTicks = (stepDelayTicks + 1) * exhaustLists.Count;
         }
 
-        public bool ExhaustEffect()
+        public void ExhaustEffect()
         {
             // === TURNING ON ===
             if (state < exhaustLists.Count)
@@ -715,8 +718,6 @@ namespace IngameScript
                     tickCounter++;
                 }
             }
-
-            return state >= exhaustLists.Count;
         }
 
         public void ExhaustOff()
