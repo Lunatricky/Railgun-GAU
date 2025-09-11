@@ -171,7 +171,7 @@ namespace IngameScript
 
                 case GAUCommandEnum.EXHAUST:
                     ExhaustReset();
-                    if (fireDelay <= exhaustEffectTicks)
+                    if (fireDelay > exhaustEffectTicks)
                     {
                         GAUCommand = GAUCommandEnum.EXHAUSTFIRE;
                     } else
@@ -185,8 +185,7 @@ namespace IngameScript
                     if (fireDelay > exhaustEffectTicks)
                     {
                         RailgunShootSalvo();
-                    }
-                    if (exhaustEffectTicks > 0)
+                    } else
                     {
                         exhaustEffectTicks--;
                     }
@@ -197,8 +196,7 @@ namespace IngameScript
                     if (fireDelay < exhaustEffectTicks)
                     {
                         ExhaustEffect();
-                    }
-                    if (exhaustEffectTicks > 0)
+                    } else
                     {
                         exhaustEffectTicks--;
                     }
