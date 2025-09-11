@@ -84,8 +84,9 @@ namespace IngameScript
         {
             Echo($"Cycle: {GAUCommand}");
             Echo($"{startString}");
-            Echo($"exhaustEffectTicks : {exhaustEffectTicks}");
+            Echo($"exhaustLists : {exhaustLists.Count}");
             Echo($"fireDelay : {fireDelay}");
+            Echo($"exhaustEffectTicks : {exhaustEffectTicks}");
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
@@ -123,14 +124,16 @@ namespace IngameScript
                 GAUTempCommand = GAUCommandEnum.NULL;
             } else if (GAUTempCommand == GAUCommandEnum.FIRE ||
                 GAUTempCommand == GAUCommandEnum.EXHAUST ||
-                GAUTempCommand == GAUCommandEnum.EXHAUSTON)
+                GAUTempCommand == GAUCommandEnum.EXHAUSTEFFECT ||
+                GAUTempCommand == GAUCommandEnum.EXHAUSTFIRE)
             {
                 GAUTempCommand = GAUCommandEnum.NULL;
             }
 
 
-            if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST || 
-                GAUCommand == GAUCommandEnum.EXHAUSTON || GAUCommand == GAUCommandEnum.CHARGING)
+            if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST ||
+                GAUTempCommand == GAUCommandEnum.EXHAUSTEFFECT || GAUTempCommand == GAUCommandEnum.EXHAUSTFIRE || 
+                GAUCommand == GAUCommandEnum.CHARGING)
             {
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
             }
@@ -168,18 +171,36 @@ namespace IngameScript
 
                 case GAUCommandEnum.EXHAUST:
                     ExhaustReset();
-                    GAUCommand = GAUCommandEnum.EXHAUSTON;
-                    break;
+                    if (fireDelay <= exhaustEffectTicks)
+                    {
+                        GAUCommand = GAUCommandEnum.EXHAUSTFIRE;
+                    } else
+                    {
+                        GAUCommand = GAUCommandEnum.EXHAUSTEFFECT;
+                    }
+                        break;
 
-                case GAUCommandEnum.EXHAUSTON:
-                    if (fireDelay >= exhaustEffectTicks)
+                case GAUCommandEnum.EXHAUSTEFFECT:
+                        ExhaustEffect();
+                    if (fireDelay > exhaustEffectTicks)
                     {
                         RailgunShootSalvo();
                     }
                     if (exhaustEffectTicks > 0)
                     {
                         exhaustEffectTicks--;
+                    }
+                    break;
+
+                case GAUCommandEnum.EXHAUSTFIRE:
+                    RailgunShootSalvo();
+                    if (fireDelay < exhaustEffectTicks)
+                    {
                         ExhaustEffect();
+                    }
+                    if (exhaustEffectTicks > 0)
+                    {
+                        exhaustEffectTicks--;
                     }
                     break;
 
@@ -643,13 +664,14 @@ namespace IngameScript
             float anglesPerSecond = 360 * RPM / 60;
             return -1 * anglesPerSecond * shootDelay;
         }
+
         public void Initialize(IMyGridTerminalSystem gridTerminalSystem)
         {
             this.gridTerminalSystem = gridTerminalSystem;
             reference = gridTerminalSystem.GetBlockWithName(referenceBlockName);
             if (reference == null)
             {
-                Echo("ERROR: Reference block not found!");
+                errorString = errorString + "\n" + $"No block named {referenceBlockName} found in group";
                 return;
             }
             // Collect all exhaust caps

@@ -15,7 +15,8 @@
         OPENINGDOOR,
         CLOSINGDOOR,
         EXHAUST,
-        EXHAUSTON,
+        EXHAUSTEFFECT,
+        EXHAUSTFIRE,
         NULL
     }
 }
