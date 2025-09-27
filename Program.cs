@@ -198,7 +198,7 @@ namespace IngameScript
                         ExhaustEffect();
                     } else
                     {
-                        exhaustEffectTicks--;
+                        fireDelay--;
                     }
                     break;
 
