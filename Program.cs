@@ -70,7 +70,7 @@ namespace IngameScript
         private int state = 0;          // Which step we're on
         private int tickCounter = 0;    // Delay counter
 
-        private float exhaustEffectTicks;
+        private float exhaustEffectDelay;
         private float fireDelay;
 
         public Program()
@@ -84,9 +84,6 @@ namespace IngameScript
         {
             Echo($"Cycle: {GAUCommand}");
             Echo($"{startString}");
-            Echo($"exhaustLists : {exhaustLists.Count}");
-            Echo($"fireDelay : {fireDelay}");
-            Echo($"exhaustEffectTicks : {exhaustEffectTicks}");
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
@@ -132,7 +129,7 @@ namespace IngameScript
 
 
             if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST ||
-                GAUTempCommand == GAUCommandEnum.EXHAUSTEFFECT || GAUTempCommand == GAUCommandEnum.EXHAUSTFIRE || 
+                GAUCommand == GAUCommandEnum.EXHAUSTEFFECT || GAUCommand == GAUCommandEnum.EXHAUSTFIRE || 
                 GAUCommand == GAUCommandEnum.CHARGING)
             {
                 Runtime.UpdateFrequency = UpdateFrequency.Update1;
@@ -171,7 +168,7 @@ namespace IngameScript
 
                 case GAUCommandEnum.EXHAUST:
                     ExhaustReset();
-                    if (fireDelay > exhaustEffectTicks)
+                    if (fireDelay > exhaustEffectDelay)
                     {
                         GAUCommand = GAUCommandEnum.EXHAUSTFIRE;
                     } else
@@ -181,19 +178,25 @@ namespace IngameScript
                         break;
 
                 case GAUCommandEnum.EXHAUSTEFFECT:
-                        ExhaustEffect();
-                    if (fireDelay > exhaustEffectTicks)
+                    ExhaustEffect();
+                    if (fireDelay > exhaustEffectDelay)
                     {
-                        RailgunShootSalvo();
+                        if (IsDoorOpen())
+                        {
+                            RailgunShootSalvo();
+                        }
                     } else
                     {
-                        exhaustEffectTicks--;
+                        exhaustEffectDelay--;
                     }
                     break;
 
                 case GAUCommandEnum.EXHAUSTFIRE:
-                    RailgunShootSalvo();
-                    if (fireDelay < exhaustEffectTicks)
+                    if (IsDoorOpen())
+                    {
+                        RailgunShootSalvo();
+                    }
+                    if (fireDelay < exhaustEffectDelay)
                     {
                         ExhaustEffect();
                     } else
@@ -719,7 +722,7 @@ namespace IngameScript
         {
             state = 0;
             tickCounter = 0;
-            exhaustEffectTicks = (stepDelayTicks + 1) * exhaustLists.Count;
+            exhaustEffectDelay = (stepDelayTicks + 1) * exhaustLists.Count;
         }
 
         public void ExhaustEffect()
