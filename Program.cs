@@ -12,6 +12,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
+        // Hello!
         private GAU gau;
 
         private IMyCubeGrid CubeGrid;
