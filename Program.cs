@@ -19,6 +19,7 @@ namespace IngameScript
         public const string CL_COMMAND_ON = "ON";
         public const string CL_COMMAND_OFF = "OFF";
         public const string CL_COMMAND_FIRE = "FIRE";
+        public const string CL_COMMAND_EXHAUST = "EXHAUST";
 
         // CommandLine Switches
         public const string CL_SWITCH_GAU_TAG = "TAG";
@@ -77,6 +78,7 @@ namespace IngameScript
                     case CL_COMMAND_ON:
                     case CL_COMMAND_OFF:
                     case CL_COMMAND_FIRE:
+                    case CL_COMMAND_EXHAUST:
                         break;
                     default:
                         hasValidCommand = false;
