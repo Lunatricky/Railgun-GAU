@@ -24,8 +24,8 @@ namespace IngameScript.Domain
     {
         #region Properties
         #region Static
-        public static string GAUGroupTag { get; set; } = "GAU Weapon";
-        public static string GAUCustomDataProviderTag { get; set;  } = "GAU Data Provider";
+        public static string GAUGroupTag { get; private set; } = "GAU Weapon";
+        public static string GAUCustomDataProviderTag { get; private set;  } = "GAU Data Provider";
         #endregion Static
         public StringBuilder Info
         {
@@ -192,11 +192,24 @@ namespace IngameScript.Domain
             }
         }
 
-       
+        private string IniSectionGAU
+        {
+            get
+            {
+                return $"{INI_SECTION_GAU_GENERAL} | {_id}";
+            }
+        }
+
+
 
         #endregion Properties
 
         #region Fields
+
+        #region Static
+        private static MyIni _iniGeneral = new MyIni();     
+        #endregion Static
+
         private MyIni _ini = new MyIni();
         private IMyTerminalBlock _customDataProvider;
         private IMyGridTerminalSystem _gridTerminalSystem;
@@ -240,8 +253,10 @@ namespace IngameScript.Domain
         private float _exhaustEffectDelay;
         private float _fireDelay;
 
-        // Ini stuff
         private string _groupName = "GAU";
+        private string _id;
+
+        // Ini stuff        
         private float _rpm = -30;
         private string _rotorName = "Gau Rotor";
         private string _exhaustTag = "Exhaust Cap";
@@ -250,7 +265,17 @@ namespace IngameScript.Domain
         #endregion Fields
 
         #region Constants
+
         #region Ini
+
+        #region Static
+        // Keys
+        private const string INI_KEY_GENERAL_GAU_GROUP_TAG = "GAU Group Tag";
+
+        // Sections
+        private const string INI_SECTION_GENERAL = "GAU Script General Settings";
+        #endregion Static
+
         // Keys
         private const string INI_KEY_GAU_GROUP_NAME = "Group Name";
         private const string INI_KEY_GAU_RPM = "RPM";
@@ -270,10 +295,11 @@ namespace IngameScript.Domain
         #endregion Constants
 
         #region Constructors
-        public GAU(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, MyGridProgram gridProgram = null)
+        public GAU(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null, MyGridProgram gridProgram = null)
         {
             _customDataProvider = customDataProvider;
             _gridTerminalSystem = gridTerminalSystem;
+            _groupName = id;
 
             if (gridProgram != null)
             {
@@ -479,10 +505,10 @@ namespace IngameScript.Domain
                     GAU gau;
                     if (gridProgram == null)
                     {
-                        gau = new GAU(customDataProvider, gridTerminalSystem, gridProgram);
+                        gau = new GAU(customDataProvider, gridTerminalSystem, group.Name, gridProgram);
                     } else
                     {
-                        gau = new GAU(customDataProvider, gridTerminalSystem, gridProgram);
+                        gau = new GAU(customDataProvider, gridTerminalSystem, group.Name, gridProgram);
                     }                  
                     if (gau.IsCreated)
                     {
@@ -988,6 +1014,41 @@ namespace IngameScript.Domain
         #endregion Plane
 
         #region ini
+
+        #region Static
+        public static void ParseIni(IMyTerminalBlock customDataProvider)
+        {
+            _iniGeneral.Clear();
+            string customData = customDataProvider.CustomData;
+            bool parsed = _iniGeneral.TryParse(customData);
+
+            if (!parsed && !string.IsNullOrWhiteSpace(customDataProvider.CustomData.Trim()))
+            {
+                _iniGeneral.EndContent = customDataProvider.CustomData;
+            }
+
+            List<string> sections = new List<string>();
+            _iniGeneral.GetSections(sections);
+
+            foreach (string sectionName in sections)
+            {
+                if (sectionName.Contains(INI_SECTION_GENERAL))
+                {
+                    GAUGroupTag = GAU._iniGeneral.Get(sectionName, INI_KEY_GENERAL_GAU_GROUP_TAG).ToString(GAUGroupTag);
+                    continue;
+                }
+            }
+
+            _iniGeneral.Set(INI_SECTION_GENERAL, INI_KEY_GENERAL_GAU_GROUP_TAG, GAUGroupTag);       
+
+            string output = _iniGeneral.ToString();
+            if (!string.Equals(output, customDataProvider.CustomData))
+            {
+                customDataProvider.CustomData = output;
+            }
+        }
+        #endregion Static
+
         private void ParseIni()
         {
             _ini.Clear();
@@ -1004,9 +1065,9 @@ namespace IngameScript.Domain
 
             foreach (string sectionName in sections)
             {
-                if (sectionName.Contains(INI_SECTION_GAU_GENERAL))
+                if (sectionName.Contains(IniSectionGAU))
                 {
-                    _groupName = _ini.Get(sectionName, INI_KEY_GAU_GROUP_NAME).ToString(_groupName);
+                    //_groupName = _ini.Get(sectionName, INI_KEY_GAU_GROUP_NAME).ToString(_groupName);
                     _rpm = (float)_ini.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
                     _rotorName = _ini.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
                     _exhaustTag = _ini.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
@@ -1017,13 +1078,13 @@ namespace IngameScript.Domain
                 }
             }
 
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_GROUP_NAME, _groupName);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_RPM, _rpm);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
-            _ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
+            //_ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_GROUP_NAME, _groupName);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
+            _ini.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
 
             string output = _ini.ToString();
             if (!string.Equals(output, _customDataProvider.CustomData))
