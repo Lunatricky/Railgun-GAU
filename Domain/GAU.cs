@@ -22,13 +22,6 @@ namespace IngameScript.Domain
         public GAU()
         {}
 
-        public GAU(List<IMySmallMissileLauncherReload> railgunBlockList, List<IMyDoor> doorBlockList, List<IMyMotorStator> rotorBlockList)
-        {
-            RailgunBlockList = railgunBlockList;
-            DoorBlockList = doorBlockList;
-            RotorBlockList = rotorBlockList;
-        }
-
         public GAUCommandEnum GAUCommand
         {
             get { return GAUCommand; }
