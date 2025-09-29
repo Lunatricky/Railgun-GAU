@@ -77,10 +77,10 @@ namespace IngameScript.Domain
                 return -1 * anglesPerSecond * _shootDelay;
             }
         }
-        public GAUCommandEnum GAUCommand
+        public GAUActionEnum GAUState
         {
-            get { return GAUCommand; }
-            set { GAUCommand = value; }
+            get { return GAUState; }
+            set { GAUState = value; }
         }
         public float RotationAngle
         {
@@ -104,7 +104,7 @@ namespace IngameScript.Domain
 
                 if (tempRailgunListIsCharged.Count == 0)
                 {
-                    tempRailgunListIsCharged = new List<IMySmallMissileLauncherReload>(RailgunBlockList);
+                    tempRailgunListIsCharged =  new List<IMySmallMissileLauncherReload>(RailgunBlockList);
                 }
 
                 foreach (IMySmallMissileLauncherReload railgun in tempRailgunListIsCharged.ToList())
@@ -156,7 +156,7 @@ namespace IngameScript.Domain
                 {
                     if (IsBlockMissing(door) && door.Status != DoorStatus.Open)
                     {
-                        GAUCommand = GAUCommandEnum.OPENINGDOOR;
+                        GAUState = GAUActionEnum.OPENINGDOOR;
                         return false;
                     }
                 }
@@ -180,7 +180,7 @@ namespace IngameScript.Domain
 
         public IMyMotorStator GAUCenterBlock { get; private set; }
 
-        private GAUCommandEnum GAUTempCommand
+        private GAUActionEnum GAUCommand
         {
             get
             {
@@ -215,7 +215,7 @@ namespace IngameScript.Domain
         private IMyGridTerminalSystem _gridTerminalSystem;
         private MyGridProgram _gridProgram;
 
-        private GAUCommandEnum _gauTempCommand = GAUCommandEnum.NULL;
+        private GAUActionEnum _gauTempCommand = GAUActionEnum.NULL;
 
         // Outputs
         private StringBuilder _errorBuilder = new StringBuilder();
@@ -542,17 +542,17 @@ namespace IngameScript.Domain
             railgun.ShootOnce();
         }      
 
-        private static bool TryParseGauCommand(string input, out GAUCommandEnum command)
+        private static bool TryParseGauCommand(string input, out GAUActionEnum command)
         {
-            command = GAUCommandEnum.NULL;
+            command = GAUActionEnum.NULL;
             try
             {
-                command = (GAUCommandEnum)Enum.Parse(typeof(GAUCommandEnum), input, true);
+                command = (GAUActionEnum)Enum.Parse(typeof(GAUActionEnum), input, true);
                 return true;
             }
             catch
             {
-                command = GAUCommandEnum.NULL;
+                command = GAUActionEnum.ON;
             }
             return false;
             /*
@@ -575,12 +575,12 @@ namespace IngameScript.Domain
         public void Run(string argument = "")
         {
             _statusBuilder.Clear();
-            _statusBuilder.Append($"Cycle: {GAUCommand}");
+            _statusBuilder.Append($"Cycle: {GAUState}");
             _statusBuilder.Append($"{_startString}");
 
-            if (TryParseGauCommand(argument, out _gauTempCommand))
+            if (!TryParseGauCommand(argument, out _gauTempCommand))
             {
-                // Failed to parse, GauTempCommand is guaranteed to be GAUCommandEnum.NULL
+                GAUState = GAUActionEnum.RESET;
             }
 
             /*
@@ -592,34 +592,34 @@ namespace IngameScript.Domain
 
             if (HasError) return;
 
-            if (GAUCommand == GAUCommandEnum.OFF && GAUTempCommand != GAUCommandEnum.ON)
+            if (GAUState == GAUActionEnum.OFF && GAUCommand != GAUActionEnum.ON)
             {
                 //Echo(InstructionCount());
                 return;
             }
 
-            if (GAUTempCommand != GAUCommandEnum.NULL &&
-                GAUCommand != GAUCommandEnum.CHARGING &&
-                GAUCommand != GAUCommandEnum.ALMOSTCHARGED &&
-                GAUCommand != GAUCommandEnum.OPENINGDOOR &&
-                GAUCommand != GAUCommandEnum.CLOSINGDOOR
+            if (GAUCommand != GAUActionEnum.NULL &&
+                GAUState != GAUActionEnum.CHARGING &&
+                GAUState != GAUActionEnum.ALMOSTCHARGED &&
+                GAUState != GAUActionEnum.OPENINGDOOR &&
+                GAUState != GAUActionEnum.CLOSINGDOOR
                 )
             {
-                GAUCommand = GAUTempCommand;
-                GAUTempCommand = GAUCommandEnum.NULL;
+                GAUState = GAUCommand;
+                GAUCommand = GAUActionEnum.NULL;
             }
-            else if (GAUTempCommand == GAUCommandEnum.FIRE ||
-                     GAUTempCommand == GAUCommandEnum.EXHAUST ||
-                     GAUTempCommand == GAUCommandEnum.EXHAUSTEFFECT ||
-                     GAUTempCommand == GAUCommandEnum.EXHAUSTFIRE)
+            else if (GAUCommand == GAUActionEnum.FIRE ||
+                     GAUCommand == GAUActionEnum.EXHAUST ||
+                     GAUCommand == GAUActionEnum.EXHAUSTEFFECT ||
+                     GAUCommand == GAUActionEnum.EXHAUSTFIRE)
             {
-                GAUTempCommand = GAUCommandEnum.NULL;
+                GAUCommand = GAUActionEnum.NULL;
             }
 
 
-            if (GAUCommand == GAUCommandEnum.FIRE || GAUCommand == GAUCommandEnum.EXHAUST ||
-                GAUCommand == GAUCommandEnum.EXHAUSTEFFECT || GAUCommand == GAUCommandEnum.EXHAUSTFIRE ||
-                GAUCommand == GAUCommandEnum.CHARGING)
+            if (GAUState == GAUActionEnum.FIRE || GAUState == GAUActionEnum.EXHAUST ||
+                GAUState == GAUActionEnum.EXHAUSTEFFECT || GAUState == GAUActionEnum.EXHAUSTFIRE ||
+                GAUState == GAUActionEnum.CHARGING)
             {
                 if (AllowsRuntimeModification) _gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
             }
@@ -635,43 +635,43 @@ namespace IngameScript.Domain
                 Echo($"-----WARNINGS-----{gau.warningString}\n------------------");
             }*/
 
-            switch (GAUCommand)
+            switch (GAUState)
             {
-                case GAUCommandEnum.ON:
-                case GAUCommandEnum.RESET:
+                case GAUActionEnum.ON:
+                case GAUActionEnum.RESET:
                     GetBlocks();
                     ToggleBlocks(true, RotorBlockList);
                     ToggleBlocks(false, RailgunBlockList);
                     OpenDoors();
                     if (IsCharged)
                     {
-                        GAUCommand = GAUCommandEnum.READY;
+                        GAUState = GAUActionEnum.READY;
                     }
                     else
                     {
-                        GAUCommand = GAUCommandEnum.CHARGE;
+                        GAUState = GAUActionEnum.CHARGE;
                     }
                     break;
 
-                case GAUCommandEnum.OFF:
+                case GAUActionEnum.OFF:
                     if (IsCharged)
                         Off();
                     break;
 
-                case GAUCommandEnum.EXHAUST:
+                case GAUActionEnum.EXHAUST:
                     ExhaustReset();
                     TrySetRotorOrRotors(TORQUE);
                     if (_fireDelay > _exhaustEffectDelay)
                     {
-                        GAUCommand = GAUCommandEnum.EXHAUSTFIRE;
+                        GAUState = GAUActionEnum.EXHAUSTFIRE;
                     }
                     else
                     {
-                        GAUCommand = GAUCommandEnum.EXHAUSTEFFECT;
+                        GAUState = GAUActionEnum.EXHAUSTEFFECT;
                     }
                     break;
 
-                case GAUCommandEnum.EXHAUSTEFFECT:
+                case GAUActionEnum.EXHAUSTEFFECT:
                     TriggerExhaustEffect();
                     if (_fireDelay > _exhaustEffectDelay)
                     {
@@ -686,7 +686,7 @@ namespace IngameScript.Domain
                     }
                     break;
 
-                case GAUCommandEnum.EXHAUSTFIRE:
+                case GAUActionEnum.EXHAUSTFIRE:
                     if (IsDoorOpen)
                     {
                         RailgunShootSalvo();
@@ -701,65 +701,65 @@ namespace IngameScript.Domain
                     }
                     break;
 
-                case GAUCommandEnum.FIRE:
+                case GAUActionEnum.FIRE:
                     if (IsDoorOpen && TrySetRotorOrRotors(TORQUE))
                     {
                         RailgunShootSalvo();
                     }
                     break;
 
-                case GAUCommandEnum.CLOSINGDOOR:
+                case GAUActionEnum.CLOSINGDOOR:
                     if (!IsDoorOpen)
                     {
                         CloseDoors();
                     }
                     else
                     {
-                        GAUCommand = GAUCommandEnum.READY;
+                        GAUState = GAUActionEnum.READY;
                     }
                     break;
 
-                case GAUCommandEnum.OPENINGDOOR:
+                case GAUActionEnum.OPENINGDOOR:
                     if (!IsDoorOpen)
                     {
                         OpenDoors();
                     }
                     else
                     {
-                        GAUCommand = GAUCommandEnum.READY;
+                        GAUState = GAUActionEnum.READY;
                     }
                     break;
 
-                case GAUCommandEnum.CHARGE:
+                case GAUActionEnum.CHARGE:
                     TrySetRotorOrRotors(TORQUENORMAL);
                     CloseDoors();
                     ToggleBlocks(true, RailgunBlockList);
                     ToggleBlocks(false, RotorBlockList);
-                    GAUCommand = GAUCommandEnum.CHARGING;
+                    GAUState = GAUActionEnum.CHARGING;
                     break;
 
-                case GAUCommandEnum.CHARGING:
+                case GAUActionEnum.CHARGING:
                     if (IsAlmostCharged)
                     {
                         railgunReloadCheck = null;
                         OpenDoors();
                         ToggleBlocks(true, RotorBlockList);
-                        GAUCommand = GAUCommandEnum.ALMOSTCHARGED;
+                        GAUState = GAUActionEnum.ALMOSTCHARGED;
                     }
                     break;
-                case GAUCommandEnum.ALMOSTCHARGED:
+                case GAUActionEnum.ALMOSTCHARGED:
                     if (IsCharged)
                     {
                         OpenDoors();
                         ToggleBlocks(true, RotorBlockList);
-                        GAUCommand = GAUCommandEnum.READY;
+                        GAUState = GAUActionEnum.READY;
                     }
                     break;
 
                 default:
                     if (!_hasCompletedfirstRun && !IsCharged)
                     {
-                        GAUCommand = GAUCommandEnum.CHARGE;
+                        GAUState = GAUActionEnum.CHARGE;
                     }
                     else
                     {
@@ -770,7 +770,7 @@ namespace IngameScript.Domain
 
             if (_areBlocksMissing)
             {
-                GAUCommand = GAUCommandEnum.RESET;
+                GAUState = GAUActionEnum.RESET;
             }
 
             _hasCompletedfirstRun = true;
@@ -852,7 +852,7 @@ namespace IngameScript.Domain
 
             if (tempRailgunListShootSalvo.Count == 0)
             {
-                GAUCommand = GAUCommandEnum.CHARGE;
+                GAUState = GAUActionEnum.CHARGE;
                 ExhaustOff();
             }
         }
@@ -891,11 +891,8 @@ namespace IngameScript.Domain
             return block == null || block.Closed || block.IsFunctional != true;
         }
 
-        // I don't know what this does luna, what is point 4. Because I do not know what this is I am not going to convert it into a property because I do not know if it represents
-        // a state of the GAU object or of something else
         public bool IsPointBetweenAngles(List<Plane> rotatedPlanes, Vector3D railgunPosition)
         {
-            // Check if the fourth point is between the two planes
             float distanceToRotated = rotatedPlanes[0].SignedDistance(railgunPosition);
             float distanceToRotated2 = rotatedPlanes[1].SignedDistance(railgunPosition);
 

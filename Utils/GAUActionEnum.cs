@@ -1,6 +1,6 @@
 ﻿namespace IngameScript.Utils
 {
-    enum GAUCommandEnum
+    enum GAUActionEnum
     {
         ON,
         OFF,
