@@ -18,9 +18,8 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
-            GAU.GAUGroupTag = "GAU Weapon"; ;
-            GAU.GAUCustomDataProviderTag = "GAU Data Provider";
-            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem, this);
+            GAU.ParseIni(Me); // Parse general settings
+            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem, this); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
