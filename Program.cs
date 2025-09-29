@@ -12,7 +12,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-
+        // Hi! :D
         private const string GAU_GROUP_NAME = "GAU";
         private const string MAIN_ROTOR_NAME = "GAU Rotor";
 
