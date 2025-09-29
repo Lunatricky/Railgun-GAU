@@ -35,7 +35,7 @@ namespace IngameScript.Domain
                 info.Append(_statusBuilder.ToString());
                 if (Errors.Length > 0)
                 {
-                    info.Append($"-----WARNINGS-----{_errorBuilder}\n------------------");
+                    info.Append($"-----ERRORS-----{_errorBuilder}\n------------------");
                 }
                 if (Warnings.Length > 0)
                 {
