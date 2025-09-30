@@ -35,6 +35,11 @@ namespace IngameScript
         public void Main(string argument, UpdateType updateSource)
         {
             ReadInput(argument);
+            foreach (GAU gau in _gauList)
+            {
+                gau.Run();
+                Echo(gau.Info.ToString());
+            }
             Echo(GetRuntimeInfo());
         }
 
