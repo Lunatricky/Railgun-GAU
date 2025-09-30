@@ -65,9 +65,9 @@ namespace IngameScript.Domain
                 return _statusBuilder;
             }
         }
-        public List<IMySmallMissileLauncherReload> RailgunBlockList { get; set; }
-        public List<IMyDoor> DoorBlockList { get; set; }
-        public List<IMyMotorStator> RotorBlockList { get; set; }
+        public List<IMySmallMissileLauncherReload> RailgunBlockList { get; set; } = new List<IMySmallMissileLauncherReload>();
+        public List<IMyDoor> DoorBlockList { get; set; } = new List<IMyDoor>();
+        public List<IMyMotorStator> RotorBlockList { get; set; } = new List<IMyMotorStator>();
 
         public float ShootDelayOffsetAngle
         {
