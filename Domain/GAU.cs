@@ -445,7 +445,7 @@ namespace IngameScript.Domain
 
             if (RotorBlockList.Count == 1)
             {
-                ConfigureGAURotors(RotorBlockList.First(), TORQUE, _rpm);
+                ConfigureGAURotors(RotorBlockList.First(), torque, _rpm);
                 MainRotorExists = true;
             }
             else
