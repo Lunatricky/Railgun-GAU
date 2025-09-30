@@ -24,7 +24,7 @@ namespace IngameScript.Domain
     {
         #region Properties
         #region Static
-        public static string GAUGroupTag { get; private set; } = "GAU Weapon";
+        public static string GAUGroupTag { get; private set; } = "GAU";
         public static string GAUCustomDataProviderTag { get; private set;  } = "GAU Data Provider";
         #endregion Static
         public StringBuilder Info
@@ -65,9 +65,9 @@ namespace IngameScript.Domain
                 return _statusBuilder;
             }
         }
-        public List<IMySmallMissileLauncherReload> RailgunBlockList { get; }
-        public List<IMyDoor> DoorBlockList { get; }
-        public List<IMyMotorStator> RotorBlockList { get; }
+        public List<IMySmallMissileLauncherReload> RailgunBlockList { get; set; }
+        public List<IMyDoor> DoorBlockList { get; set; }
+        public List<IMyMotorStator> RotorBlockList { get; set; }
 
         public float ShootDelayOffsetAngle
         {
@@ -300,15 +300,15 @@ namespace IngameScript.Domain
             _customDataProvider = customDataProvider;
             _gridTerminalSystem = gridTerminalSystem;
             _groupName = id;
+            _id = id;
 
             if (gridProgram != null)
             {
                 _gridProgram = gridProgram;
                 AllowsRuntimeModification = true;
-            }         
-
+            }
+        
             ParseIni();
-
             GetBlocks();
             IsCreated = true;
         }
@@ -503,13 +503,7 @@ namespace IngameScript.Domain
                 try
                 {
                     GAU gau;
-                    if (gridProgram == null)
-                    {
-                        gau = new GAU(customDataProvider, gridTerminalSystem, group.Name, gridProgram);
-                    } else
-                    {
-                        gau = new GAU(customDataProvider, gridTerminalSystem, group.Name, gridProgram);
-                    }                  
+                    gau = new GAU(customDataProvider, gridTerminalSystem, group.Name, gridProgram); 
                     if (gau.IsCreated)
                     {
                         gauList.Add(gau);
@@ -517,7 +511,7 @@ namespace IngameScript.Domain
                 }
                 catch
                 {
-                    continue;
+                    //TODO something something
                 }
             }
             return gauList;
@@ -1019,11 +1013,6 @@ namespace IngameScript.Domain
             string customData = customDataProvider.CustomData;
             bool parsed = _iniGeneral.TryParse(customData);
 
-            if (!parsed && !string.IsNullOrWhiteSpace(customDataProvider.CustomData.Trim()))
-            {
-                _iniGeneral.EndContent = customDataProvider.CustomData;
-            }
-
             List<string> sections = new List<string>();
             _iniGeneral.GetSections(sections);
 
@@ -1051,11 +1040,6 @@ namespace IngameScript.Domain
             _ini.Clear();
             string customData = _customDataProvider.CustomData;
             bool parsed = _ini.TryParse(customData);
-
-            if (!parsed && !string.IsNullOrWhiteSpace(_customDataProvider.CustomData.Trim()))
-            {
-                _ini.EndContent = _customDataProvider.CustomData;
-            }
 
             List<string> sections = new List<string>();
             _ini.GetSections(sections);
