@@ -18,6 +18,7 @@ using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.ObjectBuilders.Definitions;
 using VRageMath;
 using IngameScript.Utils;
+
 namespace IngameScript.Domain
 {
     partial class GAU
@@ -35,11 +36,11 @@ namespace IngameScript.Domain
                 info.Append(_statusBuilder.ToString());
                 if (Errors.Length > 0)
                 {
-                    info.Append($"-----ERRORS-----{_errorBuilder}\n------------------");
+                    info.Append($"\n-----ERRORS-----\n{_errorBuilder}\n------------------\n");
                 }
                 if (Warnings.Length > 0)
                 {
-                    info.Append($"-----WARNINGS-----{_warningBuilder}\n------------------");
+                    info.Append($"\n-----WARNINGS-----\n{_warningBuilder}\n------------------\n");
                 }
                 return info;
             }
@@ -149,7 +150,7 @@ namespace IngameScript.Domain
             {
                 foreach (IMyDoor door in DoorBlockList)
                 {
-                    if (IsBlockMissing(door) && door.Status != DoorStatus.Open)
+                    if (IsBlockMissing(door) && door.OpenRatio > _doorOpenRatio)
                     {
                         GAUState = GAUActionEnum.OPENINGDOOR;
                         return false;
@@ -231,7 +232,6 @@ namespace IngameScript.Domain
         private float _shootDelay;  // Shooting delay in seconds
         private float _targetAngle = 0; // Target angle in degrees
 
-        private float _rotationAngle;
         private bool _areBlocksMissing = false; // Keep as field in case property needs more complexity?
         private bool _hasReferenceBlock = false;
         private bool _hasCompletedfirstRun = true;
@@ -266,7 +266,9 @@ namespace IngameScript.Domain
         private string _rotorName = "Gau Rotor";
         private string _exhaustTag = "Exhaust Cap";
         private int _stepDelayTicks = 5;
-        private string _referenceBlockName = "Main Cockpit";  // Change this to your reference block name
+        private string _referenceBlockName = "Main Cockpit";
+        private float _rotationAngle = 0;  // Change this to your reference block name
+        private float _doorOpenRatio = 0.5f;
         #endregion Fields
 
         #region Constants
@@ -282,13 +284,14 @@ namespace IngameScript.Domain
         #endregion Static
 
         // Keys
-        private const string INI_KEY_GAU_GROUP_NAME = "Group Name";
         private const string INI_KEY_GAU_RPM = "RPM";
         private const string INI_KEY_GAU_MAIN_ROTOR_NAME = "Rotor Name";
         private const string INI_KEY_GAU_EXHAUST_TAG = "Exhaust Tag";
         private const string INI_KEY_GAU_STEP_DELAY_TICKS = "Step Delay Ticks";
         private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
+        private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
         private const string INI_KEY_GAU_REFERENCE_BLOCK_NAME = "Main Cockpit";
+        private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
 
         // Sections
         private const string INI_SECTION_GAU_GENERAL = "GAU - Settings";
@@ -366,12 +369,11 @@ namespace IngameScript.Domain
            
 
             bool isLG = RailgunBlockList.First().CubeGrid.GridSizeEnum.Equals(MyCubeSize.Large);
-            //RailgunChargeStateEnum.CHARGED = (isLG ? RailgunChargeStateEnumLG.CHARGED : RailgunChargeStateEnumSG.CHARGED);
-            //RailgunChargeStateEnum.ALMOST = (isLG ? RailgunChargeStateEnumLG.ALMOST : RailgunChargeStateEnumSG.ALMOST);
             _shootDelay = (isLG ? RailgunInfo.LG : RailgunInfo.SG);
-            _rotationAngle = (isLG ? RailgunInfo.rotationAngleLG : RailgunInfo.rotationAngleSG);
-
-            
+            if (_rotationAngle == 0)
+            {
+                _rotationAngle = (isLG ? RailgunInfo.rotationAngleLG : RailgunInfo.rotationAngleSG);
+            }
 
             _originPlaneAngleOffset = ShootDelayOffsetAngle;
             _fireDelay = _shootDelay * 60;
@@ -516,8 +518,6 @@ namespace IngameScript.Domain
             gridTerminalSystem.GetBlockGroups(groups, group => group.Name.Contains(GAUGroupTag));
             foreach (IMyBlockGroup group in groups)
             {
-                //List<IMyTerminalBlock> customDataProviders = new List<IMyTerminalBlock>();
-                //group.GetBlocks(customDataProviders, block => block.CustomName.Contains(GAU_CUSTOM_DATA_PROVIDER_TAG));
                 try
                 {
                     GAU gau;
@@ -568,18 +568,6 @@ namespace IngameScript.Domain
                 command = GAUActionEnum.RESET;
             }
             return false;
-            /*
-            if (input != null && input.Length != 0 && input != "")
-            {
-                try
-                {
-                    command = (GAUCommandEnum)Enum.Parse(typeof(GAUCommandEnum), input, true);
-                }
-                catch
-                {
-                    command = GAUCommandEnum.ON; // Why is this like this
-                }
-            }*/
         }
         #endregion Static
 
@@ -643,12 +631,6 @@ namespace IngameScript.Domain
                 if (AllowsRuntimeModification) _gridProgram. Runtime.UpdateFrequency = UpdateFrequency.Update100;
             }
 
-            /*
-            if (_warningBuilder.Length > 0)
-            {
-
-                Echo($"-----WARNINGS-----{gau.warningString}\n------------------");
-            }*/ 
             switch (GAUState)
             {
                 case GAUActionEnum.ON:
@@ -1056,7 +1038,6 @@ namespace IngameScript.Domain
 
         private void ParseIni()
         {
-            //_iniGeneral.Clear();
             string customData = _customDataProvider.CustomData;
             bool parsed = _iniGeneral.TryParse(customData);
 
@@ -1067,24 +1048,27 @@ namespace IngameScript.Domain
             {
                 if (sectionName.Contains(IniSectionGAU))
                 {
-                    //_groupName = _ini.Get(sectionName, INI_KEY_GAU_GROUP_NAME).ToString(_groupName);
-                    _rpm = (float)_ini.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
+                    throw new Exception("shiiiieeet");
+                    _rpm = (float) _ini.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
                     _rotorName = _ini.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
                     _exhaustTag = _ini.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
                     _stepDelayTicks = _ini.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
                     _targetAngle = (float) _ini.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
+                    _rotationAngle = (float) _ini.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
                     _referenceBlockName = _ini.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
+                    _doorOpenRatio = (float) _ini.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
                     continue;
                 }
             }
 
-            //_ini.Set(INI_SECTION_GAU_GENERAL, INI_KEY_GAU_GROUP_NAME, _groupName);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
+            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
             _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
+            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
 
             string output = _iniGeneral.ToString();
             if (!string.Equals(output, _customDataProvider.CustomData))
