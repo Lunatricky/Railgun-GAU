@@ -148,15 +148,16 @@ namespace IngameScript.Domain
         {
             get
             {
+                bool isDoorOpen = true;
                 foreach (IMyDoor door in DoorBlockList)
                 {
-                    if (IsBlockMissing(door) && door.OpenRatio > _doorOpenRatio)
+                    if (IsBlockMissing(door) && _doorOpenRatio > door.OpenRatio)
                     {
                         GAUState = GAUActionEnum.OPENINGDOOR;
-                        return false;
+                        isDoorOpen = false;
                     }
                 }
-                return true;
+                return isDoorOpen;
             }
         }
 
@@ -268,7 +269,7 @@ namespace IngameScript.Domain
         private int _stepDelayTicks = 5;
         private string _referenceBlockName = "Main Cockpit";
         private float _rotationAngle = 0;  // Change this to your reference block name
-        private float _doorOpenRatio = 0.5f;
+        private float _doorOpenRatio = 0.6f;
         #endregion Fields
 
         #region Constants
@@ -576,8 +577,8 @@ namespace IngameScript.Domain
         public void Run(string argument = "")
         {
             _statusBuilder.Clear();
-            _statusBuilder.Append($"Cycle: {GAUState}");
-            _statusBuilder.Append($"{_startString}");              
+            _statusBuilder.AppendLine($"Cycle: {GAUState}");
+            _statusBuilder.AppendLine($"{_startString}");              
             
             if (HasError)
             {
@@ -655,6 +656,11 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUST:
+                    if (!IsDoorOpen)
+                    {
+                        GAUState = GAUActionEnum.OPENINGDOOR;
+                        break;
+                    }
                     ExhaustReset();
                     TrySetRotorOrRotors(TORQUE);
                     if (_fireDelay > _exhaustEffectDelay)
@@ -671,10 +677,7 @@ namespace IngameScript.Domain
                     TriggerExhaustEffect();
                     if (_fireDelay > _exhaustEffectDelay)
                     {
-                        if (IsDoorOpen)
-                        {
-                            RailgunShootSalvo();
-                        }
+                        RailgunShootSalvo();
                     }
                     else
                     {
@@ -683,10 +686,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTFIRE:
-                    if (IsDoorOpen)
-                    {
-                        RailgunShootSalvo();
-                    }
+                    RailgunShootSalvo();
                     if (_fireDelay < _exhaustEffectDelay)
                     {
                         TriggerExhaustEffect();
@@ -698,7 +698,12 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRE:
-                    if (IsDoorOpen && TrySetRotorOrRotors(TORQUE))
+                    if (!IsDoorOpen)
+                    {
+                        GAUState = GAUActionEnum.OPENINGDOOR;
+                        break;
+                    }
+                    if (TrySetRotorOrRotors(TORQUE))
                     {
                         RailgunShootSalvo();
                     }
@@ -738,15 +743,14 @@ namespace IngameScript.Domain
                     if (IsAlmostCharged)
                     {
                         railgunReloadCheck = null;
-                        OpenDoors();
                         ToggleBlocks(true, RotorBlockList);
                         GAUState = GAUActionEnum.ALMOSTCHARGED;
                     }
                     break;
                 case GAUActionEnum.ALMOSTCHARGED:
+                    OpenDoors();
                     if (IsCharged)
                     {
-                        OpenDoors();
                         ToggleBlocks(true, RotorBlockList);
                         GAUState = GAUActionEnum.READY;
                     }
@@ -803,12 +807,8 @@ namespace IngameScript.Domain
                     railgun.Enabled = false;
                 }
             }
-
-            if (tempRailgunListOff.Count == 0)
-            {
-                ToggleBlocks(false, RailgunBlockList);
-                ToggleBlocks(false, RotorBlockList);
-            }
+            ToggleBlocks(false, RailgunBlockList);
+            ToggleBlocks(false, RotorBlockList);
         }
 
         private void ToggleBlocks<T>(bool toggle, List<T> blockList)
@@ -863,6 +863,11 @@ namespace IngameScript.Domain
                     continue;
                 }
                 door.OpenDoor();
+
+                if (_doorOpenRatio < door.OpenRatio)
+                {
+                    door.Enabled = false;
+                }
             }
         }
 
@@ -874,6 +879,7 @@ namespace IngameScript.Domain
                 {
                     continue;
                 }
+                door.Enabled = true;
                 door.CloseDoor();
             }
         }
@@ -1048,7 +1054,6 @@ namespace IngameScript.Domain
             {
                 if (sectionName.Contains(IniSectionGAU))
                 {
-                    throw new Exception("shiiiieeet");
                     _rpm = (float) _ini.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
                     _rotorName = _ini.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
                     _exhaustTag = _ini.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
