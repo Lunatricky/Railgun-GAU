@@ -217,7 +217,6 @@ namespace IngameScript.Domain
         private static MyIni _iniGeneral = new MyIni();     
         #endregion Static
 
-        private MyIni _ini = new MyIni();
         private IMyTerminalBlock _customDataProvider;
         private IMyGridTerminalSystem _gridTerminalSystem;
         private MyGridProgram _gridProgram;
@@ -1054,26 +1053,25 @@ namespace IngameScript.Domain
             {
                 if (sectionName.Contains(IniSectionGAU))
                 {
-                    _rpm = (float) _ini.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
-                    _rotorName = _ini.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
-                    _exhaustTag = _ini.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
-                    _stepDelayTicks = _ini.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
-                    _targetAngle = (float) _ini.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
-                    _rotationAngle = (float) _ini.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
-                    _referenceBlockName = _ini.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
-                    _doorOpenRatio = (float) _ini.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
-                    continue;
+                    _rpm = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
+                    _rotorName = _iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
+                    _exhaustTag = _iniGeneral.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
+                    _stepDelayTicks = _iniGeneral.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
+                    _targetAngle = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
+                    _rotationAngle = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
+                    _referenceBlockName = _iniGeneral.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
+                    _doorOpenRatio = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
                 }
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
+                _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
             }
 
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
-            _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
 
             string output = _iniGeneral.ToString();
             if (!string.Equals(output, _customDataProvider.CustomData))
