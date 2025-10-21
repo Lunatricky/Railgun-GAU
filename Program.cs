@@ -20,20 +20,30 @@ namespace IngameScript
         public const string CL_COMMAND_OFF = "OFF";
         public const string CL_COMMAND_FIRE = "FIRE";
         public const string CL_COMMAND_EXHAUST = "EXHAUST";
+        public const string CL_COMMAND_CHARGE = "CHARGE";
+        public const string CL_COMMAND_RELOAD = "RELOAD";
 
         // CommandLine Switches
         public const string CL_SWITCH_GAU_TAG = "TAG";
 
+        public string arg = "";
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
             GAU.ParseIni(Me); // Parse general settings
-            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem, this); // Each gau will create its own custom data section
+            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
+            if (arg == "")
+            {
+                arg = argument;
+            }
+
+            SetRuntimeUpdateFrequency();
+
             ReadInput(argument);
             foreach (GAU gau in _gauList)
             {
@@ -41,6 +51,29 @@ namespace IngameScript
                 Echo(gau.Info.ToString());
             }
             Echo(GetRuntimeInfo());
+        }
+
+        private void SetRuntimeUpdateFrequency()
+        {
+            bool runFast = false;
+            foreach (GAU gau in _gauList)
+            {
+                GAUActionEnum gAUState = gau.GAUState;
+                if (gAUState == GAUActionEnum.FIRE || gAUState == GAUActionEnum.FIRESTATE || gAUState == GAUActionEnum.EXHAUST ||
+                    gAUState == GAUActionEnum.EXHAUSTEFFECT || gAUState == GAUActionEnum.EXHAUSTFIRE || gAUState == GAUActionEnum.CHARGING)
+                {
+                    runFast = true;
+                }
+            }
+
+            if (runFast)
+            {
+                Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            }
+            else
+            {
+                Runtime.UpdateFrequency = UpdateFrequency.Update100;
+            }
         }
 
         public void ReadInput(string input)
@@ -84,6 +117,8 @@ namespace IngameScript
                     case CL_COMMAND_OFF:
                     case CL_COMMAND_FIRE:
                     case CL_COMMAND_EXHAUST:
+                    case CL_COMMAND_CHARGE:
+                    case CL_COMMAND_RELOAD:
                         break;
                     default:
                         hasValidCommand = false;
