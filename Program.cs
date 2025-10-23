@@ -31,8 +31,12 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
-            GAU.ParseIni(Me); // Parse general settings
-            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem); // Each gau will create its own custom data section
+            if (Me.CustomData.Length == 0)
+            {
+                GAU.ParseIni(Me); // Parse general settings
+                _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem); // Each gau will create its own custom data section
+            }
+            
         }
 
         public void Main(string argument, UpdateType updateSource)
