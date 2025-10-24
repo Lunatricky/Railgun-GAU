@@ -1,19 +1,18 @@
 ﻿namespace IngameScript.Utils
 {
-    enum GAUCommandEnum
+    enum GAUActionEnum
     {
         ON,
         OFF,
         STANDBY,
         READY,
         FIRE,
+        FIRESTATE,
         CANCEL,
-        RESET,
+        RELOAD,
         CHARGE,
         CHARGING,
         ALMOSTCHARGED,
-        OPENINGDOOR,
-        CLOSINGDOOR,
         EXHAUST,
         EXHAUSTEFFECT,
         EXHAUSTFIRE,

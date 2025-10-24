@@ -50,11 +50,12 @@
     <AdditionalFiles Include="Instructions.readme" />
     <AdditionalFiles Include="thumb.png" />
     <AdditionalFiles Include="MDK\whitelist.cache" />
+    <Compile Include="Utils\RailgunShootTimeEnum.cs" />
     <Compile Include="Utils\FireStages.cs" />
     <Compile Include="Utils\RailgunChargeStateEnumSG.cs" />
     <Compile Include="Utils\RailgunChargeStateEnumLG.cs" />
     <Compile Include="Utils\RailgunChargeStateEnum.cs" />
-    <Compile Include="Utils\GAUCommandEnum.cs" />
+    <Compile Include="Utils\GAUActionEnum.cs" />
     <Compile Include="Utils\Utils.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
