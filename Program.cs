@@ -43,32 +43,7 @@ namespace IngameScript
                 arg = argument;
             }
 
-            //SetRuntimeUpdateFrequency();
-
             ReadInput(argument);
-        }
-
-        private void SetRuntimeUpdateFrequency()
-        {
-            bool runFast = false;
-            foreach (GAU gau in _gauList)
-            {
-                GAUActionEnum gAUState = gau.GAUState;
-                if (gAUState == GAUActionEnum.FIRE || gAUState == GAUActionEnum.FIRESTATE || gAUState == GAUActionEnum.EXHAUST ||
-                    gAUState == GAUActionEnum.EXHAUSTEFFECT || gAUState == GAUActionEnum.EXHAUSTFIRE || gAUState == GAUActionEnum.CHARGING)
-                {
-                    runFast = true;
-                }
-            }
-
-            if (runFast)
-            {
-                Runtime.UpdateFrequency = UpdateFrequency.Update1;
-            }
-            else
-            {
-                Runtime.UpdateFrequency = UpdateFrequency.Update100;
-            }
         }
 
         public void ReadInput(string input)

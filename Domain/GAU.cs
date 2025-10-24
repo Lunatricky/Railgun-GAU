@@ -296,8 +296,8 @@ namespace IngameScript.Domain
             _groupName = id;
             _id = id;
 
-            ParseIni();
             GetBlocks();
+            ParseIni();
             
             IsCreated = true;
         }
@@ -740,6 +740,7 @@ namespace IngameScript.Domain
                     CloseDoors();
                     ToggleBlocks(true, RailgunBlockList);
                     GAUState = GAUActionEnum.CHARGING;
+                    ExhaustOff();
                     break;
 
                 case GAUActionEnum.CHARGING:
@@ -758,6 +759,7 @@ namespace IngameScript.Domain
 
                 default:
                     CloseDoors();
+                    ExhaustOff();
                     if (_hasCompletedfirstRun && !IsCharged)
                     {
                         GAUState = GAUActionEnum.CHARGE;
