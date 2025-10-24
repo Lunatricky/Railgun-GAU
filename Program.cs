@@ -32,8 +32,8 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
 
             GAU.ParseIni(Me); // Parse general settings
+            GAU.TryRegisterGridProgram(this); // enable runtime modification
             _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem); // Each gau will create its own custom data section
-                                                                // 
         }
 
         public void Main(string argument, UpdateType updateSource)
@@ -43,7 +43,7 @@ namespace IngameScript
                 arg = argument;
             }
 
-            SetRuntimeUpdateFrequency();
+            //SetRuntimeUpdateFrequency();
 
             ReadInput(argument);
             foreach (GAU gau in _gauList)

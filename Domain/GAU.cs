@@ -27,6 +27,13 @@ namespace IngameScript.Domain
         #region Static
         public static string GAUGroupTag { get; private set; } = "GAU";
         public static string GAUCustomDataProviderTag { get; private set; } = "GAU Data Provider";
+        public static bool AllowsRuntimeModification
+        {
+            get
+            {
+                return s_createdGAUList != null;
+            }
+        }
         #endregion Static
         public StringBuilder Info
         {
@@ -177,8 +184,7 @@ namespace IngameScript.Domain
             }
         }
 
-        public bool HasWarning { get; private set; } = false;
-        public bool AllowsRuntimeModification { get; } = false;
+        public bool HasWarning { get; private set; } = false;     
         public bool IsCreated { get; private set; }
 
         public IMyMotorStator GAUCenterBlock { get; private set; }
@@ -196,8 +202,8 @@ namespace IngameScript.Domain
 
         #region Static
         private static MyIni s_iniGeneral = new MyIni();
-        private MyGridProgram s_gridProgram;
-        private List<GAU> s_createdGAUS = new List<GAU>();
+        private static MyGridProgram s_gridProgram;
+        private static List<GAU> s_createdGAUList = new List<GAU>();
         #endregion Static
 
         private IMyTerminalBlock _customDataProvider;
@@ -299,23 +305,6 @@ namespace IngameScript.Domain
             ParseIni();
             GetBlocks();
             
-            IsCreated = true;
-        }
-        public GAU(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null, MyGridProgram gridProgram = null)
-        {
-            _customDataProvider = customDataProvider;
-            _gridTerminalSystem = gridTerminalSystem;
-            _groupName = id;
-            _id = id;
-
-            if (gridProgram != null)
-            {
-                s_gridProgram = gridProgram;
-                AllowsRuntimeModification = true;
-            }
-
-            ParseIni();
-            GetBlocks();
             IsCreated = true;
         }
         #endregion Constructors
@@ -526,6 +515,7 @@ namespace IngameScript.Domain
                     if (gau.IsCreated)
                     {
                         gauList.Add(gau);
+                        s_createdGAUList.Add(gau);
                     }
                 }
                 catch (Exception e)
@@ -571,6 +561,40 @@ namespace IngameScript.Domain
             }
             return false;
         }
+
+        private static void GAURuntimeManager()
+        {
+            if (s_createdGAUList == null) return;
+
+            foreach (GAU gau in s_createdGAUList)
+            {
+                if (gau.GAUState == GAUActionEnum.FIRE
+                    || gau.GAUState == GAUActionEnum.FIRESTATE
+                    || gau.GAUState == GAUActionEnum.EXHAUST 
+                    || gau.GAUState == GAUActionEnum.EXHAUSTEFFECT 
+                    || gau.GAUState == GAUActionEnum.EXHAUSTFIRE 
+                    || gau.GAUState == GAUActionEnum.CHARGING)
+                {
+                    if (AllowsRuntimeModification) s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
+
+                    return;
+                }           
+            }
+            if (AllowsRuntimeModification) s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update100;
+        }
+        public static bool TryRegisterGridProgram(MyGridProgram gridProgram)
+        {
+            if (s_gridProgram == null)
+            {
+                s_gridProgram = gridProgram;
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
         #endregion Static
 
         #region Non-Static
@@ -586,6 +610,8 @@ namespace IngameScript.Domain
                 return;
             }
             */
+
+            GAURuntimeManager(); // Modify Runtime
 
             _statusBuilder.Clear();
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
@@ -802,7 +828,7 @@ namespace IngameScript.Domain
             List<Plane> rotatedPlanes = getRotatedPlanes();
 
             foreach (var railgun in tempRailgunListShootSalvo.ToList())
-            {
+            {             
                 if (IsPointBetweenAngles(rotatedPlanes, railgun.GetPosition()))
                 {
                     ShootRailgun(railgun);
