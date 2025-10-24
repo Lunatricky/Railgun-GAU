@@ -614,6 +614,7 @@ namespace IngameScript.Domain
             GAURuntimeManager(); // Modify Runtime
 
             _statusBuilder.Clear();
+            _statusBuilder.AppendLine($"ID: {_id}");
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
             _statusBuilder.AppendLine($"{_startString}");
 
