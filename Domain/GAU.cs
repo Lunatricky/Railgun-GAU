@@ -178,7 +178,7 @@ namespace IngameScript.Domain
         }
 
         public bool HasWarning { get; private set; } = false;
-
+        public bool AllowsRuntimeModification { get; } = false;
         public bool IsCreated { get; private set; }
 
         public IMyMotorStator GAUCenterBlock { get; private set; }
@@ -187,7 +187,7 @@ namespace IngameScript.Domain
         {
             get
             {
-                return $"{INI_SECTION_GAU_GENERAL} | {_id}";
+                return $"{INI_SECTION_GAU_GENERAL} - {_id}";
             }
         }
         #endregion Properties
@@ -195,7 +195,9 @@ namespace IngameScript.Domain
         #region Fields
 
         #region Static
-        private static MyIni _iniGeneral = new MyIni();
+        private static MyIni s_iniGeneral = new MyIni();
+        private MyGridProgram s_gridProgram;
+        private List<GAU> s_createdGAUS = new List<GAU>();
         #endregion Static
 
         private IMyTerminalBlock _customDataProvider;
@@ -294,9 +296,26 @@ namespace IngameScript.Domain
             _groupName = id;
             _id = id;
 
-            GetBlocks();
             ParseIni();
+            GetBlocks();
+            
+            IsCreated = true;
+        }
+        public GAU(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null, MyGridProgram gridProgram = null)
+        {
+            _customDataProvider = customDataProvider;
+            _gridTerminalSystem = gridTerminalSystem;
+            _groupName = id;
+            _id = id;
 
+            if (gridProgram != null)
+            {
+                s_gridProgram = gridProgram;
+                AllowsRuntimeModification = true;
+            }
+
+            ParseIni();
+            GetBlocks();
             IsCreated = true;
         }
         #endregion Constructors
@@ -976,29 +995,26 @@ namespace IngameScript.Domain
         #region ini
 
         #region Static
-
-
         public static void ParseIni(IMyTerminalBlock customDataProvider)
         {
-            _iniGeneral.Clear();
+            s_iniGeneral.Clear();
             string customData = customDataProvider.CustomData;
-            bool parsed = _iniGeneral.TryParse(customData);
+            bool parsed = s_iniGeneral.TryParse(customData);
 
-            List<string> sections = new List<string>();
-            _iniGeneral.GetSections(sections);
+            string section = INI_SECTION_GENERAL;
 
-            foreach (string sectionName in sections)
+            if (!s_iniGeneral.ContainsSection(section))
             {
-                if (sectionName.Contains(INI_SECTION_GENERAL))
-                {
-                    GAUGroupTag = GAU._iniGeneral.Get(sectionName, INI_KEY_GENERAL_GAU_GROUP_TAG).ToString(GAUGroupTag);
-                    continue;
-                }
+                s_iniGeneral.AddSection(section);
             }
 
-            _iniGeneral.Set(INI_SECTION_GENERAL, INI_KEY_GENERAL_GAU_GROUP_TAG, GAUGroupTag);
 
-            string output = _iniGeneral.ToString();
+            GAUGroupTag = s_iniGeneral.Get(section, INI_KEY_GENERAL_GAU_GROUP_TAG).ToString(GAUGroupTag);
+
+            s_iniGeneral.Set(section, INI_KEY_GENERAL_GAU_GROUP_TAG, GAUGroupTag);
+
+
+            string output = s_iniGeneral.ToString();
             if (!string.Equals(output, customDataProvider.CustomData))
             {
                 customDataProvider.CustomData = output;
@@ -1008,39 +1024,37 @@ namespace IngameScript.Domain
 
         private void ParseIni()
         {
+            s_iniGeneral.Clear();
             string customData = _customDataProvider.CustomData;
-            bool parsed = _iniGeneral.TryParse(customData);
+            bool parsed = s_iniGeneral.TryParse(customData);
 
-            List<string> sections = new List<string>();
-            _iniGeneral.GetSections(sections);
-            foreach (string sectionName in sections)
+            string sectionName = IniSectionGAU;
+
+            if (!s_iniGeneral.ContainsSection(sectionName))
             {
-                if (sectionName.Contains(IniSectionGAU))
-                {
-                    _rpm = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
-                    _rotorName = _iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
-                    _exhaustTag = _iniGeneral.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
-                    _stepDelayTicks = _iniGeneral.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
-                    _targetAngle = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
-                    _rotationAngle = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
-                    _referenceBlockName = _iniGeneral.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
-                    _doorOpenRatio = (float)_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
-                }
-                else
-                { 
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
-                    _iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
-                }
+                s_iniGeneral.AddSection(sectionName);
             }
 
+            _rpm = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
+            _rotorName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
+            _exhaustTag = s_iniGeneral.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
+            _stepDelayTicks = s_iniGeneral.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
+            _targetAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
+            _rotationAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
+            _referenceBlockName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
+            _doorOpenRatio = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
 
-            string output = _iniGeneral.ToString();
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
+            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
+         
+            string output = s_iniGeneral.ToString();
+            _customDataProvider.CustomData = output;
             if (!string.Equals(output, _customDataProvider.CustomData))
             {
                 _customDataProvider.CustomData = output;
