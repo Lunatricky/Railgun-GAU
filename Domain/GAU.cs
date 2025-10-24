@@ -27,13 +27,7 @@ namespace IngameScript.Domain
         #region Static
         public static string GAUGroupTag { get; private set; } = "GAU";
         public static string GAUCustomDataProviderTag { get; private set; } = "GAU Data Provider";
-        public static bool AllowsRuntimeModification
-        {
-            get
-            {
-                return s_createdGAUList != null;
-            }
-        }
+
         #endregion Static
         public StringBuilder Info
         {
@@ -564,8 +558,6 @@ namespace IngameScript.Domain
 
         private static void GAURuntimeManager()
         {
-            if (s_createdGAUList == null) return;
-
             foreach (GAU gau in s_createdGAUList)
             {
                 if (gau.GAUState == GAUActionEnum.FIRE
@@ -575,12 +567,11 @@ namespace IngameScript.Domain
                     || gau.GAUState == GAUActionEnum.EXHAUSTFIRE 
                     || gau.GAUState == GAUActionEnum.CHARGING)
                 {
-                    if (AllowsRuntimeModification) s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
-
+                    s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     return;
                 }           
             }
-            if (AllowsRuntimeModification) s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update100;
+            s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update100;
         }
         public static bool TryRegisterGridProgram(MyGridProgram gridProgram)
         {

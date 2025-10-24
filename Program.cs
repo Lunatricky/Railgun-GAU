@@ -46,12 +46,6 @@ namespace IngameScript
             //SetRuntimeUpdateFrequency();
 
             ReadInput(argument);
-            foreach (GAU gau in _gauList)
-            {
-                gau.Run();
-                Echo(gau.Info.ToString());
-            }
-            Echo(GetRuntimeInfo());
         }
 
         private void SetRuntimeUpdateFrequency()
@@ -79,68 +73,78 @@ namespace IngameScript
 
         public void ReadInput(string input)
         {
-            MyCommandLine commandLine = new MyCommandLine();          
+            MyCommandLine commandLine = new MyCommandLine();
             bool hasValidCommand = false;
             bool hasTagRestriction = false;
 
-            if (commandLine.TryParse(input.ToUpper()))
+            if (!commandLine.TryParse(input.ToUpper()))
             {
-                string targetGAUTag = null;
-                if (commandLine.Switches.Count != 0)
+                foreach (GAU gau in _gauList)
                 {
-                    if (commandLine.Switch(CL_SWITCH_GAU_TAG))
+                    gau.Run();
+                    Echo(gau.Info.ToString());
+                }
+                Echo(GetRuntimeInfo());
+                return;
+            }
+
+            string targetGAUTag = null;
+            if (commandLine.Switches.Count != 0)
+            {
+                if (commandLine.Switch(CL_SWITCH_GAU_TAG))
+                {
+                    hasTagRestriction = true;
+                    try
                     {
+                        targetGAUTag = commandLine.Switch(CL_SWITCH_GAU_TAG, 0).ToString();
                         hasTagRestriction = true;
-                        try
-                        {
-                            targetGAUTag = commandLine.Switch(CL_SWITCH_GAU_TAG, 0).ToString();
-                            hasTagRestriction = true;
-                        }
-                        catch
-                        {
-                            Echo("Failed to parse target gau tag switch from command");
-                            hasTagRestriction = false;
-                        }
                     }
-                }
-
-                if (commandLine.ArgumentCount == 0)
-                {
-                    Echo("No valid argument provided");
-                    return;
-                }
-
-                string command = commandLine.Argument(0);
-                hasValidCommand = true;
-                switch (command)
-                {
-                    case CL_COMMAND_ON:
-                    case CL_COMMAND_OFF:
-                    case CL_COMMAND_FIRE:
-                    case CL_COMMAND_EXHAUST:
-                    case CL_COMMAND_CHARGE:
-                    case CL_COMMAND_RELOAD:
-                        break;
-                    default:
-                        hasValidCommand = false;
-                        break;
-                }
-
-                if (hasValidCommand)
-                {
-                    if (hasTagRestriction)
+                    catch
                     {
-                        GAU.RunWithTag(command, _gauList, targetGAUTag);
-                    }
-                    else
-                    {
-                        foreach (GAU gau in _gauList)
-                        {
-                            gau.Run(command);
-                        }
+                        Echo("Failed to parse target gau tag switch from command");
+                        hasTagRestriction = false;
                     }
                 }
-            }       
+            }
+
+            if (commandLine.ArgumentCount == 0)
+            {
+                Echo("No valid argument provided");
+                return;
+            }
+
+            string command = commandLine.Argument(0);
+            hasValidCommand = true;
+            switch (command)
+            {
+                case CL_COMMAND_ON:
+                case CL_COMMAND_OFF:
+                case CL_COMMAND_FIRE:
+                case CL_COMMAND_EXHAUST:
+                case CL_COMMAND_CHARGE:
+                case CL_COMMAND_RELOAD:
+                    break;
+                default:
+                    hasValidCommand = false;
+                    break;
+            }
+
+            if (!hasValidCommand)
+            {
+                return;
+            }
+
+            if (hasTagRestriction)
+            {
+                GAU.RunWithTag(command, _gauList, targetGAUTag);
+            }
+            else
+            {
+                foreach (GAU gau in _gauList)
+                {
+                    gau.Run(command);
+                }
+            }
         }
 
         public void Save()
