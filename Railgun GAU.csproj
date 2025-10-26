@@ -56,7 +56,6 @@
     <Compile Include="Utils\RailgunChargeStateEnumLG.cs" />
     <Compile Include="Utils\RailgunChargeStateEnum.cs" />
     <Compile Include="Utils\GAUActionEnum.cs" />
-    <Compile Include="Utils\Utils.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="AfterBuild">
