@@ -483,8 +483,8 @@ namespace IngameScript.Domain
 
         private void SetVectorOffsets()
         {
-            Vector3I behind = _circleCenter + Base6Directions.GetIntVector(Base6Directions.Direction.Backward);
-            Vector3I below = _circleCenter + Base6Directions.GetIntVector(Base6Directions.Direction.Down);
+            Vector3I behind = _circleCenter - Base6Directions.GetIntVector(_referenceBlock.Orientation.Forward);
+            Vector3I below = _circleCenter - Base6Directions.GetIntVector(_referenceBlock.Orientation.Up);
 
             _circleCenter2 = behind;
             _thridPoint = below;
