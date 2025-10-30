@@ -158,16 +158,16 @@ namespace IngameScript.Domain
         {
             get
             {
-                bool isDoorOpen = false;
+                bool IsDoorAlmostOpen = false;
                 foreach (IMyDoor door in DoorBlockList)
                 {
                     float almostOpenRatio = isLG ? _doorOpenRatio - 0.3f : _doorOpenRatio - 0.1f;
                     if (almostOpenRatio < door.OpenRatio)
                     {
-                        isDoorOpen = true;
+                        IsDoorAlmostOpen = true;
                     }
                 }
-                return isDoorOpen;
+                return IsDoorAlmostOpen;
             }
         }
 
