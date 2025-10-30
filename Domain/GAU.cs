@@ -245,6 +245,7 @@ namespace IngameScript.Domain
         private int _stepDelayTicks = 5;
         private float _rotationAngle = 0;  // Change this to your reference block name
         private float _doorOpenRatio = 0.6f;
+        private int _hangarDoorsTicksToPartialyOpen = 180;
         #endregion Fields
 
         #region Constants
@@ -269,7 +270,6 @@ namespace IngameScript.Domain
         private const string INI_KEY_GAU_STEP_DELAY_TICKS = "Step Delay Ticks";
         private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
         private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
-        private const string INI_KEY_GAU_REFERENCE_BLOCK_NAME = "Main Cockpit";
         private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
 
         // Sections
@@ -742,6 +742,14 @@ namespace IngameScript.Domain
                 case GAUActionEnum.FIRE:
                     TrySetRotorOrRotors(TORQUE);
                     if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor) {}
+                    else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
+                    {
+                        if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)
+                        {
+                            GAUState = GAUActionEnum.FIRESTATE;
+                        }
+                        _hangarDoorsTicksToPartialyOpen--;
+                    }
                     else if (!IsDoorAlmostOpen)
                     {
                         OpenDoors();
@@ -751,6 +759,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRESTATE:
+                    _hangarDoorsTicksToPartialyOpen = 180;
                     if (!IsDoorOpen)
                     {
                         OpenDoors();
