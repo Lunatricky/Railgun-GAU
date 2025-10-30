@@ -67,6 +67,7 @@ namespace IngameScript.Domain
                 return _statusBuilder;
             }
         }
+        IMyBlockGroup GAUBlockGroup;
         public List<IMySmallMissileLauncherReload> RailgunBlockList { get; set; } = new List<IMySmallMissileLauncherReload>();
         public List<IMyDoor> DoorBlockList { get; set; } = new List<IMyDoor>();
         public List<IMyMotorStator> RotorBlockList { get; set; } = new List<IMyMotorStator>();
@@ -157,28 +158,20 @@ namespace IngameScript.Domain
         {
             get
             {
-                bool isDoorOpen = false;
+                bool IsDoorAlmostOpen = false;
                 foreach (IMyDoor door in DoorBlockList)
                 {
                     float almostOpenRatio = isLG ? _doorOpenRatio - 0.3f : _doorOpenRatio - 0.1f;
                     if (almostOpenRatio < door.OpenRatio)
                     {
-                        isDoorOpen = true;
+                        IsDoorAlmostOpen = true;
                     }
                 }
-                return isDoorOpen;
+                return IsDoorAlmostOpen;
             }
         }
 
-        public bool HasError
-        {
-            get
-            {
-                return !_hasReferenceBlock;
-            }
-        }
-
-        public bool HasWarning { get; private set; } = false;     
+        public bool HasWarning { get; private set; } = false;
         public bool IsCreated { get; private set; }
 
         public IMyMotorStator GAUCenterBlock { get; private set; }
@@ -213,10 +206,9 @@ namespace IngameScript.Domain
 
         private float _shootDelay;  // Shooting delay in seconds
         private float _targetAngle = 0; // Target angle in degrees
-        
+
         private string _railGunChargeStateDetailedInfoString = "";
         private bool isLG;
-        private bool _hasReferenceBlock = false;
         private bool _hasCompletedfirstRun = false;
         private float _originPlaneAngleOffset = 0;
 
@@ -233,7 +225,9 @@ namespace IngameScript.Domain
 
         private double _groupTolerance = 0.1;                 // Distance tolerance to consider blocks a pair
 
-        private IMyTerminalBlock _referenceBlock;
+        private IMyShipController _referenceBlock;
+        private MyBlockOrientation _referenceBlockOrientation;
+        private Vector3I _referenceBlockGridCoords;
         private readonly List<List<IMyFunctionalBlock>> exhaustLists = new List<List<IMyFunctionalBlock>>();
         private int _state = 0;          // Which step we're on
         private int _tickCounter = 0;    // Delay counter
@@ -247,11 +241,11 @@ namespace IngameScript.Domain
         // Ini stuff
         private float _rpm = -30;
         private string _rotorName = "Gau Rotor";
-        private string _exhaustTag = "Exhaust Cap";
+        private string _exhaustTag = "Exhaust";
         private int _stepDelayTicks = 5;
-        private string _referenceBlockName = "Main Cockpit";
         private float _rotationAngle = 0;  // Change this to your reference block name
         private float _doorOpenRatio = 0.6f;
+        private int _hangarDoorsTicksToPartialyOpen = 180;
         #endregion Fields
 
         #region Constants
@@ -276,7 +270,6 @@ namespace IngameScript.Domain
         private const string INI_KEY_GAU_STEP_DELAY_TICKS = "Step Delay Ticks";
         private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
         private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
-        private const string INI_KEY_GAU_REFERENCE_BLOCK_NAME = "Main Cockpit";
         private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
 
         // Sections
@@ -296,30 +289,54 @@ namespace IngameScript.Domain
             _groupName = id;
             _id = id;
 
-            GetBlocks();
+            GetBlocksGeneric();
             ParseIni();
-            
+            GetBlocksIni();
+
             IsCreated = true;
         }
         #endregion Constructors
 
         #region Init
 
-        public void GetBlocks()
+        public void GetBlocksIni()
         {
-            IMyBlockGroup GAUBlockGroup = _gridTerminalSystem.GetBlockGroupWithName(_groupName);
+            //TODO don't pass grid terminal system, pass groups to GAU class instead
+            GAUBlockGroup = _gridTerminalSystem.GetBlockGroupWithName(_groupName);
+            GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
+
+            if (AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor"))
+            {
+                return;
+            }
+
+            if (!(RotorBlockList.Count == 1 || RotorBlockList.Count == 2))
+            {
+                _errorBuilder.Append("\n" + $"Scrip only works with 1 or 2 rotors no more no less");
+                return;
+            }
+
+            if (!TrySetRotorOrRotors(TORQUENORMAL))
+            {
+                _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
+                return;
+            }
+        }
+
+        public void GetBlocksGeneric()
+        {
+            //TODO don't pass grid terminal system, pass groups to GAU class instead
+            GAUBlockGroup = _gridTerminalSystem.GetBlockGroupWithName(_groupName);
             GAUBlockGroup?.GetBlocksOfType(RailgunBlockList);
             GAUBlockGroup?.GetBlocksOfType(DoorBlockList);
             GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
 
             _startString = "";
 
-
             if (AreBlocksMissingFromGroupErrorMessage(RailgunBlockList, "Railgun") || AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor"))
             {
                 return;
             }
-
 
             AreBlocksMissingFromGroupWarningMessage(DoorBlockList, "Door");
 
@@ -329,27 +346,36 @@ namespace IngameScript.Domain
                 return;
             }
 
-
-
-            Initialize(_gridTerminalSystem);
-
-
-
             if (!TrySetRotorOrRotors(TORQUENORMAL))
             {
                 _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
                 return;
             }
 
+            List<IMyShipController> myShipControllers = new List<IMyShipController>();
+            GAUBlockGroup.GetBlocksOfType(myShipControllers);
 
+            if (AreBlocksMissingFromGroupErrorMessage(myShipControllers, "ShipControllers"))
+            {
+                return;
+            }
 
+            //TODO save _referenceBlockOrientation and _referenceBlockGridCoords in  custom data
+            _referenceBlock = myShipControllers.First();
+            _referenceBlockOrientation = _referenceBlock.Orientation; 
+            _referenceBlockGridCoords = _referenceBlock.Position;
+
+            Initialize();
             SetVectorOffsets();
+            GridSizeSettings();
+            ExhaustReset();
+        }
 
-
-
+        private void GridSizeSettings()
+        {
             isLG = RailgunBlockList.First().CubeGrid.GridSizeEnum.Equals(MyCubeSize.Large);
 
-            _railGunChargeStateDetailedInfoString = (isLG? RailgunChargeStateEnumLG.CHARGED : RailgunChargeStateEnumSG.CHARGED);
+            _railGunChargeStateDetailedInfoString = (isLG ? RailgunChargeStateEnumLG.CHARGED : RailgunChargeStateEnumSG.CHARGED);
 
             _shootDelay = (isLG ? RailgunInfo.LG : RailgunInfo.SG);
 
@@ -360,28 +386,21 @@ namespace IngameScript.Domain
 
             _originPlaneAngleOffset = ShootDelayOffsetAngle;
             _fireDelay = _shootDelay * 60;
-            ExhaustReset();
         }
 
-        public void Initialize(IMyGridTerminalSystem gridTerminalSystem)
+        public void Initialize()
         {
-            _referenceBlock = gridTerminalSystem.GetBlockWithName(_referenceBlockName);
-            _hasReferenceBlock = _referenceBlock != null;
-            if (!_hasReferenceBlock)
-            {
-                _errorBuilder.Append("\n" + $"No block named {_referenceBlockName} found in group");
-                return;
-            }
+            Vector3D referenceBlockWorldCoords = GetWorldPosition(_referenceBlockGridCoords);
             // Collect all exhaust caps
             List<IMyFunctionalBlock> allExhausts = new List<IMyFunctionalBlock>();
-            gridTerminalSystem.GetBlocksOfType<IMyFunctionalBlock>(allExhausts, b => b.CustomName.Contains(_exhaustTag));
+            GAUBlockGroup?.GetBlocksOfType<IMyFunctionalBlock>(allExhausts, b => b.CustomName.Contains(_exhaustTag));
 
             // Build a list of exhausts + distances
             List<IMyFunctionalBlock> sortedExhausts = new List<IMyFunctionalBlock>(allExhausts);
             sortedExhausts.Sort(delegate (IMyFunctionalBlock a, IMyFunctionalBlock b)
             {
-                double da = Vector3D.Distance(_referenceBlock.GetPosition(), a.GetPosition());
-                double db = Vector3D.Distance(_referenceBlock.GetPosition(), b.GetPosition());
+                double da = Vector3D.Distance(referenceBlockWorldCoords, a.GetPosition());
+                double db = Vector3D.Distance(referenceBlockWorldCoords, b.GetPosition());
                 return da.CompareTo(db);
             });
 
@@ -389,12 +408,12 @@ namespace IngameScript.Domain
             exhaustLists.Clear();
             foreach (IMyFunctionalBlock sortedExhaust in sortedExhausts)
             {
-                double dist = Vector3D.Distance(_referenceBlock.GetPosition(), sortedExhaust.GetPosition());
+                double dist = Vector3D.Distance(referenceBlockWorldCoords, sortedExhaust.GetPosition());
                 bool placed = false;
 
                 foreach (List<IMyFunctionalBlock> exhaustList in exhaustLists)
                 {
-                    double groupDist = Vector3D.Distance(_referenceBlock.GetPosition(), exhaustList[0].GetPosition());
+                    double groupDist = Vector3D.Distance(referenceBlockWorldCoords, exhaustList[0].GetPosition());
                     if (Math.Abs(groupDist - dist) < _groupTolerance)
                     {
                         exhaustList.Add(sortedExhaust);
@@ -421,7 +440,10 @@ namespace IngameScript.Domain
             motorStator.BrakingTorque = torque;
             motorStator.TargetVelocityRPM = targetVelocityRPM;
             GAUCenterBlock = motorStator;
-            _circleCenter = GAUCenterBlock.Position;
+            if (_circleCenter == new Vector3I())
+            {
+                _circleCenter = GAUCenterBlock.Position;
+            }
         }
 
         public bool TrySetRotorOrRotors(float torque)
@@ -483,8 +505,13 @@ namespace IngameScript.Domain
 
         private void SetVectorOffsets()
         {
-            Vector3I behind = _circleCenter - Base6Directions.GetIntVector(_referenceBlock.Orientation.Forward);
-            Vector3I below = _circleCenter - Base6Directions.GetIntVector(_referenceBlock.Orientation.Up);
+            if (_referenceBlockOrientation == null ||(_circleCenter2 != new Vector3I() && _thridPoint != new Vector3I()))
+            {
+                return;
+            }
+
+            Vector3I behind = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Forward);
+            Vector3I below = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Up);
 
             _circleCenter2 = behind;
             _thridPoint = below;
@@ -562,14 +589,14 @@ namespace IngameScript.Domain
             {
                 if (gau.GAUState == GAUActionEnum.FIRE
                     || gau.GAUState == GAUActionEnum.FIRESTATE
-                    || gau.GAUState == GAUActionEnum.EXHAUST 
-                    || gau.GAUState == GAUActionEnum.EXHAUSTEFFECT 
-                    || gau.GAUState == GAUActionEnum.EXHAUSTFIRE 
+                    || gau.GAUState == GAUActionEnum.EXHAUST
+                    || gau.GAUState == GAUActionEnum.EXHAUSTEFFECT
+                    || gau.GAUState == GAUActionEnum.EXHAUSTFIRE
                     || gau.GAUState == GAUActionEnum.CHARGING)
                 {
                     s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     return;
-                }           
+                }
             }
             s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update100;
         }
@@ -609,12 +636,6 @@ namespace IngameScript.Domain
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
             _statusBuilder.AppendLine($"{_startString}");
 
-            if (HasError)
-            {
-                _statusBuilder.Append($"{_errorBuilder.ToString()}");
-                return;
-            }
-
             if (argument != null && argument.Length != 0 && argument != "")
             {
                 if (!TryParseGauCommand(argument, out _gauTempCommand))
@@ -647,8 +668,9 @@ namespace IngameScript.Domain
             {
                 case GAUActionEnum.ON:
                 case GAUActionEnum.RELOAD:
-                    GetBlocks();
+                    GetBlocksGeneric();
                     ParseIni();
+                    GetBlocksIni();
                     ToggleBlocks(true, RotorBlockList);
                     ToggleBlocks(false, RailgunBlockList);
 
@@ -672,7 +694,7 @@ namespace IngameScript.Domain
                     if (!IsDoorAlmostOpen)
                     {
                         OpenDoors();
-                    break;
+                        break;
                     }
                     ExhaustReset();
                     if (_fireDelay > _exhaustEffectDelay)
@@ -719,7 +741,16 @@ namespace IngameScript.Domain
 
                 case GAUActionEnum.FIRE:
                     TrySetRotorOrRotors(TORQUE);
-                    if (!IsDoorAlmostOpen)
+                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor) {}
+                    else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
+                    {
+                        if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)
+                        {
+                            GAUState = GAUActionEnum.FIRESTATE;
+                        }
+                        _hangarDoorsTicksToPartialyOpen--;
+                    }
+                    else if (!IsDoorAlmostOpen)
                     {
                         OpenDoors();
                         break;
@@ -728,6 +759,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRESTATE:
+                    _hangarDoorsTicksToPartialyOpen = 180;
                     if (!IsDoorOpen)
                     {
                         OpenDoors();
@@ -822,7 +854,7 @@ namespace IngameScript.Domain
             List<Plane> rotatedPlanes = getRotatedPlanes();
 
             foreach (var railgun in tempRailgunListShootSalvo.ToList())
-            {             
+            {
                 if (IsPointBetweenAngles(rotatedPlanes, railgun.GetPosition()))
                 {
                     ShootRailgun(railgun);
@@ -844,8 +876,6 @@ namespace IngameScript.Domain
                 ExhaustOff();
             }
         }
-
-
 
         private void OpenDoors()
         {
@@ -873,7 +903,7 @@ namespace IngameScript.Domain
 
         private bool IsBlockMissingInList<T>(List<T> blockList)
         {
-            foreach(T blockT in blockList)
+            foreach (T blockT in blockList)
             {
                 IMyTerminalBlock block = (IMyTerminalBlock)blockT;
                 if (block == null || block.Closed || block.IsFunctional != true)
@@ -1055,13 +1085,14 @@ namespace IngameScript.Domain
                 s_iniGeneral.AddSection(sectionName);
             }
 
+            //TODO save _circleCenter, _circleCenter2 and _thridPoint in CD
+
             _rpm = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
             _rotorName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
             _exhaustTag = s_iniGeneral.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
             _stepDelayTicks = s_iniGeneral.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
             _targetAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
             _rotationAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
-            _referenceBlockName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_REFERENCE_BLOCK_NAME).ToString(_referenceBlockName);
             _doorOpenRatio = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
 
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
@@ -1070,9 +1101,8 @@ namespace IngameScript.Domain
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_REFERENCE_BLOCK_NAME, _referenceBlockName);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
-         
+
             string output = s_iniGeneral.ToString();
             _customDataProvider.CustomData = output;
             if (!string.Equals(output, _customDataProvider.CustomData))
