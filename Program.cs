@@ -122,9 +122,6 @@ namespace IngameScript
             }
         }
 
-        public void Save()
-        {
-
         }     
         private String GetRuntimeInfo()
         {
