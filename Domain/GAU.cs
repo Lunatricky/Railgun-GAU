@@ -242,7 +242,7 @@ namespace IngameScript.Domain
         private float _rpm = -30;
         private string _rotorName = "Gau Rotor";
         private string _exhaustTag = "Exhaust";
-        private int _stepDelayTicks = 5;
+        private int _stepDelayTicks = 2;
         private float _rotationAngle = 0;  // Change this to your reference block name
         private float _doorOpenRatio = 0.6f;
         private int _hangarDoorsTicksToPartialyOpen = 180;
@@ -377,11 +377,11 @@ namespace IngameScript.Domain
 
             _railGunChargeStateDetailedInfoString = (isLG ? RailgunChargeStateEnumLG.CHARGED : RailgunChargeStateEnumSG.CHARGED);
 
-            _shootDelay = (isLG ? RailgunInfo.LG : RailgunInfo.SG);
+            _shootDelay = (isLG ? InGameValues.LG : InGameValues.SG);
 
             if (_rotationAngle == 0)
             {
-                _rotationAngle = (isLG ? RailgunInfo.rotationAngleLG : RailgunInfo.rotationAngleSG);
+                _rotationAngle = (isLG ? InGameValues.rotationAngleLG : InGameValues.rotationAngleSG);
             }
 
             _originPlaneAngleOffset = ShootDelayOffsetAngle;
@@ -459,7 +459,7 @@ namespace IngameScript.Domain
             {
                 foreach (IMyMotorStator rotor in RotorBlockList)
                 {
-                    if (rotor.CustomName.Contains(_rotorName))
+                    if (rotor.CustomName.ToLower().Contains(_rotorName.ToLower()))
                     {
                         ConfigureGAURotors(rotor, torque, _rpm);
                         MainRotorExists = true;
@@ -620,14 +620,6 @@ namespace IngameScript.Domain
 
         public void Run(string argument = "")
         {
-            /*
-            if (GAUActionEnum.RELOAD != GAUState && (IsBlockMissingInList(RotorBlockList) || 
-                IsBlockMissingInList(RailgunBlockList) || (DoorBlockList.Count > 0 && IsBlockMissingInList(DoorBlockList))))
-            {
-                GAUState = GAUActionEnum.RELOAD;
-                return;
-            }
-            */
 
             GAURuntimeManager(); // Modify Runtime
 
@@ -741,7 +733,7 @@ namespace IngameScript.Domain
 
                 case GAUActionEnum.FIRE:
                     TrySetRotorOrRotors(TORQUE);
-                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor) {}
+                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) {}
                     else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
                     {
                         if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)

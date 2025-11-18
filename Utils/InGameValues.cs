@@ -1,6 +1,6 @@
 ﻿namespace IngameScript.Utils
 {
-    public static class RailgunInfo
+    public static class InGameValues
     {
         public static float LG = 2.00f;
         public static float SG = 0.50f;
