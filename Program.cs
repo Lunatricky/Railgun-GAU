@@ -1,4 +1,4 @@
-﻿using IngameScript.Utils;
+7﻿using IngameScript.Utils;
 using IngameScript.Domain;
 using Sandbox.ModAPI.Ingame;
 using System;
@@ -122,7 +122,6 @@ namespace IngameScript
             }
         }
 
-        }     
         private String GetRuntimeInfo()
         {
             StringBuilder m_echoBuilder = new StringBuilder(512);
