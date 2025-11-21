@@ -1,4 +1,4 @@
-7﻿using IngameScript.Utils;
+using IngameScript.Utils;
 using IngameScript.Domain;
 using Sandbox.ModAPI.Ingame;
 using System;
@@ -23,9 +23,6 @@ namespace IngameScript
         public const string CL_COMMAND_CHARGE = "CHARGE";
         public const string CL_COMMAND_RELOAD = "RELOAD";
 
-        // CommandLine Switches
-        public const string CL_SWITCH_GAU_TAG = "TAG";
-
         public string arg = "";
         public Program()
         {
@@ -38,21 +35,7 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            if (arg == "")
-            {
-                arg = argument;
-            }
-
-            ReadInput(argument);
-        }
-
-        public void ReadInput(string input)
-        {
-            MyCommandLine commandLine = new MyCommandLine();
-            bool hasValidCommand = false;
-            bool hasTagRestriction = false;
-
-            if (!commandLine.TryParse(input.ToUpper()))
+            if (string.IsNullOrWhiteSpace(argument))
             {
                 foreach (GAU gau in _gauList)
                 {
@@ -63,34 +46,30 @@ namespace IngameScript
                 return;
             }
 
-            string targetGAUTag = null;
-            if (commandLine.Switches.Count != 0)
+            ReadInput(argument);
+        }
+
+        public void ReadInput(string input)
+        {
+            bool hasValidCommand = true;
+
+            string groupName = "";
+            string command;
+
+            int sep = input.IndexOf(':');
+
+
+            if (sep < 0) // no separator
             {
-                if (commandLine.Switch(CL_SWITCH_GAU_TAG))
-                {
-                    hasTagRestriction = true;
-                    try
-                    {
-                        targetGAUTag = commandLine.Switch(CL_SWITCH_GAU_TAG, 0).ToString();
-                        hasTagRestriction = true;
-                    }
-                    catch
-                    {
-                        Echo("Failed to parse target gau tag switch from command");
-                        hasTagRestriction = false;
-                    }
-                }
+                command = input.Trim();
+            }
+            else
+            {
+                command = input.Substring(0, sep).Trim();
+                groupName = input.Substring(sep + 1).Trim();
             }
 
-            if (commandLine.ArgumentCount == 0)
-            {
-                Echo("No valid argument provided");
-                return;
-            }
-
-            string command = commandLine.Argument(0);
-            hasValidCommand = true;
-            switch (command)
+            switch (command.ToUpper())
             {
                 case CL_COMMAND_ON:
                 case CL_COMMAND_OFF:
@@ -109,9 +88,9 @@ namespace IngameScript
                 return;
             }
 
-            if (hasTagRestriction)
+            if (!string.IsNullOrWhiteSpace(groupName))
             {
-                GAU.RunWithTag(command, _gauList, targetGAUTag);
+                GAU.RunWithTag(command, _gauList, groupName);
             }
             else
             {
@@ -120,6 +99,7 @@ namespace IngameScript
                     gau.Run(command);
                 }
             }
+            Echo(GetRuntimeInfo());
         }
 
         private String GetRuntimeInfo()

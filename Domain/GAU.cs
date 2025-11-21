@@ -204,6 +204,7 @@ namespace IngameScript.Domain
         private StringBuilder _statusBuilder = new StringBuilder();
         private string _startString = "";
 
+        private float _shootTimeout;
         private float _shootDelay;  // Shooting delay in seconds
         private float _targetAngle = 0; // Target angle in degrees
 
@@ -240,7 +241,7 @@ namespace IngameScript.Domain
 
         // Ini stuff
         private float _rpm = -30;
-        private string _rotorName = "Gau Rotor";
+        private string _rotorName = "GAU Rotor";
         private string _exhaustTag = "Exhaust";
         private int _stepDelayTicks = 2;
         private float _rotationAngle = 0;  // Change this to your reference block name
@@ -682,6 +683,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUST:
+                    _shootTimeout = 0;
                     TrySetRotorOrRotors(TORQUE);
                     if (!IsDoorAlmostOpen)
                     {
@@ -700,6 +702,14 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTEFFECT:
+                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    {
+                        GAUState = GAUActionEnum.CHARGE;
+                        break;
+                    }
+
+                    _shootTimeout++;
+
                     if (!IsDoorOpen)
                     {
                         OpenDoors();
@@ -716,6 +726,14 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTFIRE:
+                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    {
+                        GAUState = GAUActionEnum.CHARGE;
+                        break;
+                    }
+
+                    _shootTimeout++;
+
                     if (!IsDoorOpen)
                     {
                         OpenDoors();
@@ -732,6 +750,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRE:
+                    _shootTimeout = 0;
                     TrySetRotorOrRotors(TORQUE);
                     if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) {}
                     else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
@@ -751,6 +770,14 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRESTATE:
+                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    {
+                        GAUState = GAUActionEnum.CHARGE;
+                        break;
+                    }
+
+                    _shootTimeout++;
+
                     _hangarDoorsTicksToPartialyOpen = 180;
                     if (!IsDoorOpen)
                     {
