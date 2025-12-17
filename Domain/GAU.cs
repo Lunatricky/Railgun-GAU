@@ -511,11 +511,8 @@ namespace IngameScript.Domain
                 return;
             }
 
-            Vector3I behind = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Forward);
-            Vector3I below = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Up);
-
-            _circleCenter2 = behind;
-            _thridPoint = below;
+            _circleCenter2 = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Forward);
+            _thridPoint = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Up);
         }
         #endregion Init
 
@@ -752,6 +749,11 @@ namespace IngameScript.Domain
                 case GAUActionEnum.FIRE:
                     _shootTimeout = 0;
                     TrySetRotorOrRotors(TORQUE);
+                    if (DoorBlockList == null || DoorBlockList.Count == 0)
+                    {
+                        GAUState = GAUActionEnum.FIRESTATE;
+                        break;
+                    }
                     if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) {}
                     else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
                     {
