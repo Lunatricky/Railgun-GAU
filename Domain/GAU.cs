@@ -317,7 +317,7 @@ namespace IngameScript.Domain
                 return;
             }
 
-            if (!TrySetRotorOrRotors(TORQUENORMAL))
+            if (!TrySetRotorOrRotors(TORQUENORMAL, -_rpm))
             {
                 _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
                 return;
@@ -347,7 +347,7 @@ namespace IngameScript.Domain
                 return;
             }
 
-            if (!TrySetRotorOrRotors(TORQUENORMAL))
+            if (!TrySetRotorOrRotors(TORQUENORMAL, -_rpm))
             {
                 _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
                 return;
@@ -440,6 +440,7 @@ namespace IngameScript.Domain
             motorStator.Torque = torque;
             motorStator.BrakingTorque = torque;
             motorStator.TargetVelocityRPM = targetVelocityRPM;
+            motorStator.UpperLimitRad = 0;
             GAUCenterBlock = motorStator;
             if (_circleCenter == new Vector3I())
             {
@@ -448,6 +449,11 @@ namespace IngameScript.Domain
         }
 
         public bool TrySetRotorOrRotors(float torque)
+        {
+            return TrySetRotorOrRotors(torque, _rpm);
+        }
+
+            public bool TrySetRotorOrRotors(float torque, float _rpm)
         {
             bool MainRotorExists = false;
 
@@ -467,7 +473,7 @@ namespace IngameScript.Domain
                     }
                     else
                     {
-                        ConfigureGAURotors(rotor, torque, -1 * _rpm);
+                        ConfigureGAURotors(rotor, torque, -_rpm);
                     }
                 }
             }
@@ -681,7 +687,7 @@ namespace IngameScript.Domain
 
                 case GAUActionEnum.EXHAUST:
                     _shootTimeout = 0;
-                    TrySetRotorOrRotors(TORQUE);
+                    TrySetRotorOrRotors(TORQUE, _rpm);
                     if (!IsDoorAlmostOpen)
                     {
                         OpenDoors();
@@ -699,7 +705,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTEFFECT:
-                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
                     {
                         GAUState = GAUActionEnum.CHARGE;
                         break;
@@ -723,7 +729,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTFIRE:
-                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
                     {
                         GAUState = GAUActionEnum.CHARGE;
                         break;
@@ -748,7 +754,7 @@ namespace IngameScript.Domain
 
                 case GAUActionEnum.FIRE:
                     _shootTimeout = 0;
-                    TrySetRotorOrRotors(TORQUE);
+                    TrySetRotorOrRotors(TORQUE, _rpm);
                     if (DoorBlockList == null || DoorBlockList.Count == 0)
                     {
                         GAUState = GAUActionEnum.FIRESTATE;
@@ -789,7 +795,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.CHARGE:
-                    TrySetRotorOrRotors(TORQUENORMAL);
+                    TrySetRotorOrRotors(TORQUENORMAL, -_rpm);
                     CloseDoors();
                     ToggleBlocks(true, RailgunBlockList);
                     GAUState = GAUActionEnum.CHARGING;
