@@ -228,7 +228,7 @@ namespace IngameScript.Domain
 
         private IMyShipController _referenceBlock;
         private MyBlockOrientation _referenceBlockOrientation;
-        private Vector3I _referenceBlockGridCoords;
+        private Vector3I _referenceBlockGridCoords = Vector3I.Zero;
         private readonly List<List<IMyFunctionalBlock>> exhaustLists = new List<List<IMyFunctionalBlock>>();
         private int _state = 0;          // Which step we're on
         private int _tickCounter = 0;    // Delay counter
@@ -272,6 +272,7 @@ namespace IngameScript.Domain
         private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
         private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
         private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
+        private const string REFERENCE_BLOCK_GRID_COORDS = "Reference Grid Coords";
 
         // Sections
         private const string INI_SECTION_GAU_GENERAL = "GAU - Settings";
@@ -979,11 +980,34 @@ namespace IngameScript.Domain
 
             return worldCoords;
         }
-        #endregion Gau Primary Methods
 
-        #region Exhaust Methods
+        public static Vector3I TryParseVector3I(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s))
+                return new Vector3I();
 
-        public void TriggerExhaustEffect()
+            var parts = s.Split(',');
+            if (parts.Length != 3)
+                return new Vector3I();
+
+            int x, y, z;
+
+            if (!int.TryParse(parts[0], out x)) return new Vector3I();
+            if (!int.TryParse(parts[1], out y)) return new Vector3I();
+            if (!int.TryParse(parts[2], out z)) return new Vector3I();
+
+            return new Vector3I(x, y, z);
+        }
+
+        public static String Vector3ItoString(Vector3I vector3I)
+        { 
+            return vector3I.X + ", " + vector3I.Y + ", " + vector3I.Z;
+        }
+            #endregion Gau Primary Methods
+
+            #region Exhaust Methods
+
+            public void TriggerExhaustEffect()
         {
             // === TURNING ON ===
             if (_state < exhaustLists.Count)
@@ -1112,7 +1136,7 @@ namespace IngameScript.Domain
                 s_iniGeneral.AddSection(sectionName);
             }
 
-            //TODO save _circleCenter, _circleCenter2 and _thridPoint in CD
+            String referenceBlockGridCoords;
 
             _rpm = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
             _rotorName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
@@ -1121,6 +1145,11 @@ namespace IngameScript.Domain
             _targetAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
             _rotationAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
             _doorOpenRatio = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
+            referenceBlockGridCoords = s_iniGeneral.Get(sectionName, REFERENCE_BLOCK_GRID_COORDS).ToString(Vector3ItoString(_referenceBlockGridCoords));
+
+            // Get Reference block grid coords from CD
+            _referenceBlockGridCoords = TryParseVector3I(referenceBlockGridCoords);
+            
 
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
@@ -1129,6 +1158,7 @@ namespace IngameScript.Domain
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
             s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
+            s_iniGeneral.Set(IniSectionGAU, REFERENCE_BLOCK_GRID_COORDS, referenceBlockGridCoords);
 
             string output = s_iniGeneral.ToString();
             _customDataProvider.CustomData = output;
