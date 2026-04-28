@@ -23,14 +23,16 @@ namespace IngameScript
         public const string CL_COMMAND_CHARGE = "CHARGE";
         public const string CL_COMMAND_RELOAD = "RELOAD";
 
+        private IMyProgrammableBlock me;
+
         public string arg = "";
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
-
-            GAU.ParseIni(Me); // Parse general settings
+            me = Me;
+            GAU.ParseIni(me); // Parse general settings
             GAU.TryRegisterGridProgram(this); // enable runtime modification
-            _gauList = GAU.AcquireGAUs(Me, GridTerminalSystem); // Each gau will create its own custom data section
+            _gauList = GAU.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
@@ -39,8 +41,12 @@ namespace IngameScript
             {
                 foreach (GAU gau in _gauList)
                 {
-                    gau.Run();
+                    gau.Run(me);
                     Echo(gau.Info.ToString());
+                    foreach(IMyTextSurface surface in gau.LcdBlockList)
+                    {
+                        surface.WriteText(gau.Info);
+                    }
                 }
                 Echo(GetRuntimeInfo());
                 return;
