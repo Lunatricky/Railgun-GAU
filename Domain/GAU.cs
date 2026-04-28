@@ -244,7 +244,7 @@ namespace IngameScript.Domain
         private string _rotorName = "GAU Rotor";
         private string _exhaustTag = "Exhaust";
         private int _stepDelayTicks = 2;
-        private float _rotationAngle = 0;  // Change this to your reference block name
+        private float _rotationAngle = 6;
         private float _doorOpenRatio = 0.6f;
         private int _hangarDoorsTicksToPartialyOpen = 180;
         #endregion Fields
