@@ -71,6 +71,7 @@ namespace IngameScript.Domain
         public List<IMySmallMissileLauncherReload> RailgunBlockList { get; set; } = new List<IMySmallMissileLauncherReload>();
         public List<IMyDoor> DoorBlockList { get; set; } = new List<IMyDoor>();
         public List<IMyMotorStator> RotorBlockList { get; set; } = new List<IMyMotorStator>();
+        public List<IMyTextSurface> LcdBlockList { get; set; } = new List<IMyTextSurface>();
 
         public float ShootDelayOffsetAngle
         {
@@ -202,7 +203,6 @@ namespace IngameScript.Domain
         private StringBuilder _errorBuilder = new StringBuilder();
         private StringBuilder _warningBuilder = new StringBuilder();
         private StringBuilder _statusBuilder = new StringBuilder();
-        private string _startString = "";
 
         private float _shootTimeout;
         private float _shootDelay;  // Shooting delay in seconds
@@ -332,13 +332,9 @@ namespace IngameScript.Domain
             GAUBlockGroup?.GetBlocksOfType(RailgunBlockList);
             GAUBlockGroup?.GetBlocksOfType(DoorBlockList);
             GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
+            GAUBlockGroup?.GetBlocksOfType(LcdBlockList);
 
-            _startString = "";
-
-            if (AreBlocksMissingFromGroupErrorMessage(RailgunBlockList, "Railgun") || AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor"))
-            {
-                return;
-            }
+            if (AreBlocksMissingFromGroupErrorMessage(RailgunBlockList, "Railgun") || AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor")) return;
 
             AreBlocksMissingFromGroupWarningMessage(DoorBlockList, "Door");
 
@@ -353,6 +349,8 @@ namespace IngameScript.Domain
                 _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
                 return;
             }
+
+            SetupSurface(LcdBlockList);
 
             List<IMyShipController> myShipControllers = new List<IMyShipController>();
             GAUBlockGroup.GetBlocksOfType(myShipControllers);
@@ -371,6 +369,23 @@ namespace IngameScript.Domain
             SetVectorOffsets();
             GridSizeSettings();
             ExhaustReset();
+        }
+
+        private static void SetupSurface(List<IMyTextSurface> surfaces)
+        {
+            foreach (IMyTextSurfaceProvider surfaceProvider in surfaces)
+            {
+                // Only take the first surface (index 0)
+                if (surfaceProvider.SurfaceCount > 0)
+                {
+                    var surface = surfaceProvider.GetSurface(0);
+
+                    surface.ContentType = ContentType.TEXT_AND_IMAGE;
+                    surface.Font = "DEBUG";
+                    surface.FontSize = 1.7f;
+                    surface.Alignment = TextAlignment.LEFT;
+                }
+            }
         }
 
         private void GridSizeSettings()
@@ -491,7 +506,6 @@ namespace IngameScript.Domain
             }
             else
             {
-                _startString = _startString + "\n" + $"{blockType} count: {list.Count}";
                 return false;
             }
         }
@@ -506,7 +520,6 @@ namespace IngameScript.Domain
             }
             else
             {
-                _startString = _startString + "\n" + $"{blockType} count: {list.Count}";
                 return false;
             }
         }
@@ -623,7 +636,12 @@ namespace IngameScript.Domain
         #region Non-Static
         #region Run
 
-        public void Run(string argument = "")
+        public void Run(string argument)
+        {
+            Run(null, argument);
+        }
+
+        public void Run(IMyProgrammableBlock me, string argument = "")
         {
 
             GAURuntimeManager(); // Modify Runtime
@@ -631,7 +649,11 @@ namespace IngameScript.Domain
             _statusBuilder.Clear();
             _statusBuilder.AppendLine($"ID: {_id}");
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
-            _statusBuilder.AppendLine($"{_startString}");
+
+            StringBuilder scriptInfo = InfoString();
+
+            _statusBuilder.AppendLine($"{scriptInfo}");
+            if (me != null) me.GetSurface(0).WriteText(scriptInfo.ToString());
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
@@ -643,7 +665,6 @@ namespace IngameScript.Domain
 
             if (GAUActionEnum.OFF == GAUState && GAUActionEnum.ON != _gauTempCommand)
             {
-                //Echo(InstructionCount());
                 return;
             }
 
@@ -761,7 +782,7 @@ namespace IngameScript.Domain
                         GAUState = GAUActionEnum.FIRESTATE;
                         break;
                     }
-                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) {}
+                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) { }
                     else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
                     {
                         if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)
@@ -832,9 +853,54 @@ namespace IngameScript.Domain
             }
 
             _hasCompletedfirstRun = true;
-            // Echo(InstructionCount());
+        }
+
+        private StringBuilder InfoString()
+        {
+            StringBuilder _infoString = new StringBuilder();
+            _infoString.AppendLine(new string('-', 28));
+            _infoString.AppendLine(_groupName);
+            _infoString.AppendLine("Railguns:");
+
+            int workingRailguns = 0;
+            foreach (IMyFunctionalBlock railgun in RailgunBlockList)
+            {
+                if (!railgun.Closed && railgun.IsFunctional) workingRailguns++;
+            }
+
+            _infoString.AppendLine($" -working: {workingRailguns} / {RailgunBlockList.Count}");
+
+            int chargedRailgunCounter = 0;
+            foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
+            {
+                chargedRailgunCounter = CheckCounter(chargedRailgunCounter, railgun, _railGunChargeStateDetailedInfoString);
+            }
+
+            _infoString.AppendLine($" -charged: {chargedRailgunCounter} / {workingRailguns}");
+
+            _infoString.AppendLine($"Rotor position: {GetRotorAngle360(RotorBlockList.First())}");
+
+            if (DoorBlockList.Count > 0)
+            {
+                int workingDoors = 0;
+                foreach (IMyFunctionalBlock door in DoorBlockList)
+                {
+                    if (!door.Closed && door.IsFunctional) workingDoors++;
+                }
+
+                _infoString.Append($"Doors working: {workingDoors} / {DoorBlockList.Count}");
+            }
+            return _infoString;
+        }
+        double GetRotorAngle360(IMyMotorStator rotor)
+        {
+            if (rotor == null || rotor.Closed) return 0.0;
+
+            double degrees = MathHelper.ToDegrees(rotor.Angle);
+            return (degrees + 360) % 360;        // Converts to 0–360 range
         }
         #endregion Run
+
         private void Off()
         {
             CloseDoors();
@@ -1024,11 +1090,13 @@ namespace IngameScript.Domain
                 }
             }
         }
+
         public void ExhaustOff()
         {
             // === TURNING OFF ===
             exhaustLists.ForEach(exhaustList => exhaustList.ForEach(exhaust => exhaust.Enabled = false));
         }
+
         public void ExhaustReset()
         {
             _state = 0;
