@@ -26,6 +26,10 @@ namespace IngameScript
         private IMyProgrammableBlock me;
 
         public string arg = "";
+
+        double maxRuntimeMs = 0;
+        int tickCounter = 0;
+
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
@@ -110,8 +114,20 @@ namespace IngameScript
 
         private String GetRuntimeInfo()
         {
+            tickCounter++;
+
+            if (tickCounter % 20 == 1)
+            {
+                maxRuntimeMs = 0;
+            }
+
             StringBuilder m_echoBuilder = new StringBuilder(512);
             m_echoBuilder.Append($"Runtime: {Math.Round(Runtime.LastRunTimeMs, 5)} Ms\n");
+
+            double newRuntimeMs = Math.Round(Runtime.LastRunTimeMs, 5);
+            maxRuntimeMs = Math.Max(newRuntimeMs, maxRuntimeMs);
+
+            m_echoBuilder.Append($"Max Runtime: {maxRuntimeMs} Ms\n");
             m_echoBuilder.Append($"Instruction Count: {Runtime.CurrentInstructionCount}\n");
             m_echoBuilder.Append($"Complexity: {Math.Round((double)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount, 5)}%\n");
             return m_echoBuilder.ToString();

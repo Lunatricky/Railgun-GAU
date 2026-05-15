@@ -1,28 +1,23 @@
-﻿using Sandbox.Game.EntityComponents;
+﻿using IngameScript.Utils;
 using Sandbox.ModAPI.Ingame;
-using Sandbox.ModAPI.Interfaces;
-using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
-using VRage;
-using VRage.Collections;
 using VRage.Game;
-using VRage.Game.Components;
 using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Game.ObjectBuilders.Definitions;
 using VRageMath;
-using IngameScript.Utils;
 
 namespace IngameScript.Domain
 {
     partial class GAU
     {
+        //Ini
+        Dictionary<string, string> __snapshot = new Dictionary<string, string>();
+        bool iniAnyChanged = false;
+        int tickCount;
+
         #region Properties
         #region Static
         public static string GAUGroupTag { get; private set; } = "GAU";
@@ -91,27 +86,28 @@ namespace IngameScript.Domain
                 bool isCharged = false;
                 int chargedCounter = 0;
 
-                if (tempRailgunListIsCharged.Count == 0)
+                if (tempRailgunListIsCharging.Count == 0)
                 {
-                    tempRailgunListIsCharged = new List<IMySmallMissileLauncherReload>(RailgunBlockList);
+                    tempRailgunListIsCharging = new List<IMySmallMissileLauncherReload>(RailgunBlockList);
                 }
 
-                for (int i = tempRailgunListIsCharged.Count - 1; i >= 0; i--)
+                for (int i = tempRailgunListIsCharging.Count - 1; i >= 0; i--)
                 {
-                    var railgun = tempRailgunListIsCharged[i];
-                    int checkCounter = CheckCounter(chargedCounter, railgun, _railGunChargeStateDetailedInfoString);
+                    var railgun = tempRailgunListIsCharging[i];
+                    int checkCounter = CheckRailgunChargeStateCounter(chargedCounter, railgun, _railGunChargeStateDetailedInfoString);
 
                     if (checkCounter != chargedCounter)
                     {
                         chargedCounter = checkCounter;
                         railgun.Enabled = false;
-                        tempRailgunListIsCharged.RemoveAt(i); // Safe in reverse
+                        tempRailgunListIsCharging.RemoveAt(i); // Safe in reverse
                     }
                 }
 
-                if (tempRailgunListIsCharged.Count == 0)
+                if (tempRailgunListIsCharging.Count == 0)
                 {
                     isCharged = true;
+                    tempRailgunListShootSalvo.Clear();
                 }
 
                 return isCharged;
@@ -211,7 +207,7 @@ namespace IngameScript.Domain
         private string _railGunChargeStateDetailedInfoString = "";
         private bool isLG;
         private bool _hasCompletedfirstRun = false;
-        private float _originPlaneAngleOffset = 0;
+        private float _originPlaneAngleOffset;
 
         private Vector3I _circleCenter = new Vector3I();
         private Vector3I _circleCenter2 = new Vector3I();
@@ -220,7 +216,7 @@ namespace IngameScript.Domain
         private IMySmallMissileLauncherReload railgunReloadCheck;
 
         private List<IMySmallMissileLauncherReload> tempRailgunListShootSalvo = new List<IMySmallMissileLauncherReload>();
-        private List<IMySmallMissileLauncherReload> tempRailgunListIsCharged = new List<IMySmallMissileLauncherReload>();
+        private List<IMySmallMissileLauncherReload> tempRailgunListIsCharging = new List<IMySmallMissileLauncherReload>();
         private List<IMySmallMissileLauncherReload> tempRailgunListOff = new List<IMySmallMissileLauncherReload>();
 
 
@@ -244,8 +240,8 @@ namespace IngameScript.Domain
         private string _rotorName = "GAU Rotor";
         private string _exhaustTag = "Exhaust";
         private int _stepDelayTicks = 2;
-        private float _rotationAngle = 5;
-        private float _doorOpenRatio = 0.6f;
+        private float _rotationAngle = 10;
+        private float _doorOpenRatio = 0.5f;
         private int _hangarDoorsTicksToPartialyOpen = 180;
         #endregion Fields
 
@@ -254,8 +250,6 @@ namespace IngameScript.Domain
         #region Ini
 
         #region Static
-
-
 
         // Keys
         private const string INI_KEY_GENERAL_GAU_GROUP_TAG = "GAU Group Tag";
@@ -643,9 +637,6 @@ namespace IngameScript.Domain
 
         public void Run(IMyProgrammableBlock me, string argument = "")
         {
-
-            GAURuntimeManager(); // Modify Runtime
-
             _statusBuilder.Clear();
             _statusBuilder.AppendLine($"ID: {_id}");
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
@@ -653,15 +644,34 @@ namespace IngameScript.Domain
             StringBuilder scriptInfo = InfoString();
 
             _statusBuilder.AppendLine($"{scriptInfo}");
+
+            tickCount++;
+            if (tickCount % 100 == 1)
+            {
+                iniAnyChanged = ParseIni();
+            }
+
+            if (GAUActionEnum.FIRE != _gauTempCommand && 
+                GAUActionEnum.EXHAUST != _gauTempCommand && 
+                GAUActionEnum.FIRESTATE != _gauTempCommand &&
+                GAUActionEnum.EXHAUSTEFFECT != _gauTempCommand &&
+                GAUActionEnum.EXHAUSTFIRE != _gauTempCommand &&
+                GAUActionEnum.CHARGING != _gauTempCommand &&
+                iniAnyChanged)
+            {
+                GAUState = GAUActionEnum.RELOAD;
+                iniAnyChanged = false;
+                return;
+            }
             if (me != null) me.GetSurface(0).WriteText(scriptInfo.ToString());
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
-                if (!TryParseGauCommand(argument, out _gauTempCommand))
-                {
-                    GAUState = GAUActionEnum.RELOAD;
-                }
+                TryParseGauCommand(argument, out _gauTempCommand);
+                return;
             }
+
+            GAURuntimeManager(); // Modify Runtime
 
             if (GAUActionEnum.OFF == GAUState && GAUActionEnum.ON != _gauTempCommand)
             {
@@ -670,16 +680,18 @@ namespace IngameScript.Domain
 
             if (GAUActionEnum.NULL != _gauTempCommand &&
                 GAUActionEnum.CHARGING != GAUState &&
-                GAUActionEnum.ALMOSTCHARGED != GAUState
-                )
+                GAUActionEnum.ALMOSTCHARGED != GAUState)
             {
                 GAUState = _gauTempCommand;
                 _gauTempCommand = GAUActionEnum.NULL;
             }
-            else if (GAUActionEnum.FIRE == _gauTempCommand ||
-                     GAUActionEnum.EXHAUST == _gauTempCommand)
+            else if ((GAUActionEnum.FIRE == _gauTempCommand ||
+                     GAUActionEnum.EXHAUST == _gauTempCommand) &&
+                     tempRailgunListIsCharging.Count < RailgunBlockList.Count)
             {
+                GAUState = _gauTempCommand;
                 _gauTempCommand = GAUActionEnum.NULL;
+                return;
             }
 
             switch (GAUState)
@@ -708,6 +720,13 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUST:
+                    tempRailgunListShootSalvo.Clear();
+                    foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
+                    {
+                        if (CheckRailgunChargeState(railgun, RailgunChargeStateEnum.CHARGED))
+                            tempRailgunListShootSalvo.Add(railgun);
+                    }
+
                     _shootTimeout = 0;
                     TrySetRotorOrRotors(TORQUE, _rpm);
                     if (!IsDoorAlmostOpen)
@@ -873,7 +892,7 @@ namespace IngameScript.Domain
             int chargedRailgunCounter = 0;
             foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
             {
-                chargedRailgunCounter = CheckCounter(chargedRailgunCounter, railgun, _railGunChargeStateDetailedInfoString);
+                chargedRailgunCounter = CheckRailgunChargeStateCounter(chargedRailgunCounter, railgun, _railGunChargeStateDetailedInfoString);
             }
 
             _infoString.AppendLine($" -charged: {chargedRailgunCounter} / {workingRailguns}");
@@ -1024,7 +1043,7 @@ namespace IngameScript.Domain
         }
         #endregion Bools
 
-        private static int CheckCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
+        private static int CheckRailgunChargeStateCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
         {
             string detailString = railgun.DetailedInfo;
 
@@ -1034,6 +1053,17 @@ namespace IngameScript.Domain
             }
 
             return chargeCounter;
+        }
+
+        private static bool CheckRailgunChargeState(IMySmallMissileLauncherReload railgun, string railgunChargeState)
+        {
+            string detailString = railgun.DetailedInfo;
+
+            if (railgun.IsFunctional && detailString.Contains(railgunChargeState))
+            {
+                return true;
+            }
+            return false;
         }
 
         public Vector3D GetWorldPosition(Vector3I localPosition)
@@ -1150,8 +1180,8 @@ namespace IngameScript.Domain
             Vector3D rotationAxis = Vector3D.Normalize(center2 - center1);
 
             // Rotate the third point around the axis by X degrees to find the rotated plane
-            Vector3D rotatedPoint = RotationHelper.RotateVector(point - center1, rotationAxis, _rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
-            Vector3D rotatedPoint2 = RotationHelper.RotateVector(point - center1, rotationAxis, -_rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
+            Vector3D rotatedPoint = RotationHelper.RotateVector(point - center1, rotationAxis, 180 +  _rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
+            Vector3D rotatedPoint2 = RotationHelper.RotateVector(point - center1, rotationAxis, 180 -_rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
 
             return new List<Plane>
             {
@@ -1191,8 +1221,9 @@ namespace IngameScript.Domain
         }
         #endregion Static
 
-        private void ParseIni()
+        private bool ParseIni()
         {
+            bool iniAnyChanged = false;
             s_iniGeneral.Clear();
             string customData = _customDataProvider.CustomData;
             bool parsed = s_iniGeneral.TryParse(customData);
@@ -1218,15 +1249,14 @@ namespace IngameScript.Domain
             // Get Reference block grid coords from CD
             _referenceBlockGridCoords = TryParseVector3I(referenceBlockGridCoords);
             
-
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
-            s_iniGeneral.Set(IniSectionGAU, REFERENCE_BLOCK_GRID_COORDS, referenceBlockGridCoords);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
+            iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, REFERENCE_BLOCK_GRID_COORDS, referenceBlockGridCoords);
 
             string output = s_iniGeneral.ToString();
             _customDataProvider.CustomData = output;
@@ -1234,6 +1264,22 @@ namespace IngameScript.Domain
             {
                 _customDataProvider.CustomData = output;
             }
+            return iniAnyChanged;
+        }
+
+        bool ReadAndDetectChange(MyIni ini, string section, string key, object newVal)
+        {
+            ini.Set(section, key, newVal.ToString());
+
+            string old;
+            string newValString = newVal.ToString();
+            __snapshot.TryGetValue(key, out old);
+            if (old != newValString)
+            {
+                __snapshot[key] = newValString;
+                return true;
+            }
+            return false;
         }
         #endregion ini
     }
