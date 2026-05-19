@@ -651,8 +651,8 @@ namespace IngameScript.Domain
                 iniAnyChanged = ParseIni();
             }
 
-            if (GAUActionEnum.FIRE != _gauTempCommand && 
-                GAUActionEnum.EXHAUST != _gauTempCommand && 
+            if (GAUActionEnum.FIRE != _gauTempCommand &&
+                GAUActionEnum.EXHAUST != _gauTempCommand &&
                 GAUActionEnum.FIRESTATE != _gauTempCommand &&
                 GAUActionEnum.EXHAUSTEFFECT != _gauTempCommand &&
                 GAUActionEnum.EXHAUSTFIRE != _gauTempCommand &&
@@ -746,7 +746,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTEFFECT:
-                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
+                    if (IsShootTimeOut())
                     {
                         GAUState = GAUActionEnum.CHARGE;
                         break;
@@ -770,7 +770,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.EXHAUSTFIRE:
-                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
+                    if (IsShootTimeOut())
                     {
                         GAUState = GAUActionEnum.CHARGE;
                         break;
@@ -819,7 +819,7 @@ namespace IngameScript.Domain
                     break;
 
                 case GAUActionEnum.FIRESTATE:
-                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
+                    if (IsShootTimeOut())
                     {
                         GAUState = GAUActionEnum.CHARGE;
                         break;
@@ -872,6 +872,11 @@ namespace IngameScript.Domain
             }
 
             _hasCompletedfirstRun = true;
+        }
+
+        private bool IsShootTimeOut()
+        {
+            return _shootTimeout > 8 * 60 * 60 / Math.Abs(_rpm);
         }
 
         private StringBuilder InfoString()
