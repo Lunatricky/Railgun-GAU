@@ -38,8 +38,17 @@
   <Import Project="MDK/MDK.options.props" />
   <Import Project="MDK/MDK.paths.props" Condition="exists('MDK/MDK.paths.props')" />
   <ItemGroup>
-    <Compile Include="Domain\LCDManager.cs" />
     <Compile Include="Domain\GAU.cs" />
+    <Compile Include="Domain\GauIni.cs" />
+    <Compile Include="Domain\GauBlocks.cs" />
+    <Compile Include="Features\GauCycle.cs" />
+    <Compile Include="Features\GauCharge.cs" />
+    <Compile Include="Features\GauDoors.cs" />
+    <Compile Include="Features\GauRotors.cs" />
+    <Compile Include="Features\GauSalvo.cs" />
+    <Compile Include="Features\GauExhaust.cs" />
+    <Compile Include="Features\GauView.cs" />
+    <Compile Include="Utils\GauGeo.cs" />
     <Compile Include="MDK\Bootstrapper.cs" />
     <AdditionalFiles Include="MDK\MDK.options.props">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

@@ -13,7 +13,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        private List<GAU> _gauList = new List<GAU>();
+        private List<GauGeo> _gauList = new List<GauGeo>();
 
         // CommandLine Commands
         public const string CL_COMMAND_ON = "ON";
@@ -34,16 +34,16 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             me = Me;
-            GAU.ParseIni(me); // Parse general settings
-            GAU.TryRegisterGridProgram(this); // enable runtime modification
-            _gauList = GAU.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
+            GauGeo.ParseIni(me); // Parse general settings
+            GauGeo.TryRegisterGridProgram(this); // enable runtime modification
+            _gauList = GauGeo.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
             if (string.IsNullOrWhiteSpace(argument))
             {
-                foreach (GAU gau in _gauList)
+                foreach (GauGeo gau in _gauList)
                 {
                     gau.Run(me);
                     Echo(gau.Info.ToString());
@@ -100,11 +100,11 @@ namespace IngameScript
 
             if (!string.IsNullOrWhiteSpace(groupName))
             {
-                GAU.RunWithTag(command, _gauList, groupName);
+                GauGeo.RunWithTag(command, _gauList, groupName);
             }
             else
             {
-                foreach (GAU gau in _gauList)
+                foreach (GauGeo gau in _gauList)
                 {
                     gau.Run(command);
                 }
