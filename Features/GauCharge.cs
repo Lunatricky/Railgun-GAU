@@ -1,4 +1,5 @@
 using Sandbox.ModAPI.Ingame;
+using System;
 using System.Collections.Generic;
 
 namespace IngameScript.Domain
@@ -26,7 +27,7 @@ namespace IngameScript.Domain
                     {
                         chargedCounter = checkCounter;
                         railgun.Enabled = false;
-                        tempRailgunListIsCharging.RemoveAt(i); // Safe in reverse
+                        tempRailgunListIsCharging.RemoveAt(i);
                     }
                 }
 
@@ -44,28 +45,94 @@ namespace IngameScript.Domain
         {
             get
             {
-                bool result = false;
+                if (!IsBlockMissing(railgunReloadCheck) && RailgunLooksFullyCharged(railgunReloadCheck))
+                    return true;
 
-                if (!IsBlockMissing(railgunReloadCheck))
+                foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
                 {
-                    return railgunReloadCheck.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString);
+                    if (RailgunLooksFullyCharged(railgun))
+                        return true;
                 }
-                else
-                {
-                    foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
-                    {
-                        result = railgun.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString);
-                    }
-                }
-                return result;
+
+                return false;
             }
         }
 
-        private static int CheckRailgunChargeStateCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
+        private static string RailgunChargeInfo(IMySmallMissileLauncherReload railgun)
         {
-            string detailString = railgun.DetailedInfo;
+            string detailed = railgun.DetailedInfo ?? "";
+            string custom = railgun.CustomInfo ?? "";
+            if (custom.Length == 0)
+                return detailed;
+            if (detailed.Length == 0)
+                return custom;
+            return detailed + "\n" + custom;
+        }
 
-            if (railgun.IsFunctional && detailString.Contains(railgunChargeState))
+        private bool RailgunLooksFullyCharged(IMySmallMissileLauncherReload railgun)
+        {
+            if (railgun == null || !railgun.IsFunctional)
+                return false;
+            return DetailLooksFullyCharged(RailgunChargeInfo(railgun), _railGunChargeStateDetailedInfoString);
+        }
+
+        private bool DetailLooksFullyCharged(string detailString, string railgunChargeState)
+        {
+            if (string.IsNullOrEmpty(detailString))
+                return false;
+
+            if (!string.IsNullOrEmpty(railgunChargeState)
+                && detailString.IndexOf(railgunChargeState, StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            double kwh;
+            if (!TryGetStoredKwh(detailString, out kwh))
+                return false;
+
+            double fullKwh = isLG ? 500.0 : 16.0;
+            return kwh + 0.05 >= fullKwh;
+        }
+
+        private static bool TryGetStoredKwh(string detailString, out double kwh)
+        {
+            kwh = 0;
+            int idx = detailString.IndexOf("Stored Power:", StringComparison.OrdinalIgnoreCase);
+            if (idx < 0)
+                return false;
+
+            string rest = detailString.Substring(idx);
+            int nlPos = rest.IndexOf('\n');
+            if (nlPos < 0)
+                nlPos = rest.IndexOf('\r');
+            if (nlPos >= 0)
+                rest = rest.Substring(0, nlPos);
+
+            int colon = rest.IndexOf(':');
+            if (colon >= 0)
+                rest = rest.Substring(colon + 1);
+
+            rest = rest.Replace('\u00A0', ' ').Trim();
+            string[] parts = rest.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+                return false;
+
+            double val;
+            if (!double.TryParse(parts[0], out val))
+                return false;
+
+            string unit = parts.Length > 1 ? parts[1] : "kWh";
+            if (unit.IndexOf("MWh", StringComparison.OrdinalIgnoreCase) >= 0)
+                kwh = val * 1000.0;
+            else if (unit.Equals("Wh", StringComparison.OrdinalIgnoreCase))
+                kwh = val / 1000.0;
+            else
+                kwh = val;
+            return true;
+        }
+
+        private int CheckRailgunChargeStateCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
+        {
+            if (RailgunLooksFullyCharged(railgun))
             {
                 chargeCounter++;
             }
@@ -75,13 +142,7 @@ namespace IngameScript.Domain
 
         private static bool CheckRailgunChargeState(IMySmallMissileLauncherReload railgun, string railgunChargeState)
         {
-            string detailString = railgun.DetailedInfo;
-
-            if (railgun.IsFunctional && detailString.Contains(railgunChargeState))
-            {
-                return true;
-            }
-            return false;
+            return railgun.IsFunctional && railgun.DetailedInfo.Contains(railgunChargeState);
         }
     }
 }

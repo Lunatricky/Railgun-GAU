@@ -13,7 +13,6 @@ namespace IngameScript.Domain
             ParseIni();
             GetBlocksIni();
             ToggleBlocks(true, RotorBlockList);
-            ToggleBlocks(false, RailgunBlockList);
 
             if (IsCharged)
             {
@@ -62,7 +61,7 @@ namespace IngameScript.Domain
         {
             if (IsShootTimeOut())
             {
-                GAUState = GAUActionEnum.CHARGE;
+                FinishSalvoCycle();
                 return;
             }
 
@@ -87,7 +86,7 @@ namespace IngameScript.Domain
         {
             if (IsShootTimeOut())
             {
-                GAUState = GAUActionEnum.CHARGE;
+                FinishSalvoCycle();
                 return;
             }
 
@@ -138,7 +137,7 @@ namespace IngameScript.Domain
         {
             if (IsShootTimeOut())
             {
-                GAUState = GAUActionEnum.CHARGE;
+                FinishSalvoCycle();
                 return;
             }
 
@@ -154,6 +153,13 @@ namespace IngameScript.Domain
 
         private void CycleCharge()
         {
+            if (IsCharged)
+            {
+                ExhaustOff();
+                GAUState = GAUActionEnum.READY;
+                return;
+            }
+
             TrySetRotorOrRotors(TORQUENORMAL, -_rpm);
             CloseDoors();
             ToggleBlocks(true, RailgunBlockList);
@@ -190,6 +196,12 @@ namespace IngameScript.Domain
             {
                 ToggleBlocks(false, RailgunBlockList);
             }
+        }
+
+        private void FinishSalvoCycle()
+        {
+            ExhaustOff();
+            GAUState = IsCharged ? GAUActionEnum.READY : GAUActionEnum.CHARGE;
         }
 
         private bool IsShootTimeOut()

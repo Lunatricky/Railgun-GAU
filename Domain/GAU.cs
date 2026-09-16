@@ -372,9 +372,7 @@ namespace IngameScript.Domain
 
             foreach (IMySmallMissileLauncherReload railgun in tempRailgunListOff)
             {
-                string detailString = railgun.DetailedInfo;
-
-                if (!detailString.Contains(_railGunChargeStateDetailedInfoString))
+                if (!RailgunLooksFullyCharged(railgun))
                 {
                     tempRailgunListOff.Remove(railgun);
                     break;

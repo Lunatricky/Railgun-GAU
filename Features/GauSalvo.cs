@@ -35,7 +35,7 @@ namespace IngameScript.Domain
                     }
                 }
 
-                if (!railgun.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString))
+                if (!RailgunLooksFullyCharged(railgun))
                 {
                     tempRailgunListShootSalvo.Remove(railgun);
                 }
@@ -43,8 +43,7 @@ namespace IngameScript.Domain
 
             if (tempRailgunListShootSalvo.Count == 0)
             {
-                GAUState = GAUActionEnum.CHARGE;
-                ExhaustOff();
+                FinishSalvoCycle();
             }
         }
 
