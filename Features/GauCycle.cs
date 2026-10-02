@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         private void CycleOnOrReload()
         {
@@ -16,11 +16,11 @@ namespace IngameScript.Domain
 
             if (IsCharged)
             {
-                GAUState = GAUActionEnum.READY;
+                GAUState = GauActionEnum.READY;
             }
             else
             {
-                GAUState = GAUActionEnum.CHARGE;
+                GAUState = GauActionEnum.CHARGE;
             }
         }
 
@@ -49,11 +49,11 @@ namespace IngameScript.Domain
             ExhaustReset();
             if (_fireDelay > _exhaustEffectDelay)
             {
-                GAUState = GAUActionEnum.EXHAUSTFIRE;
+                GAUState = GauActionEnum.EXHAUSTFIRE;
             }
             else
             {
-                GAUState = GAUActionEnum.EXHAUSTEFFECT;
+                GAUState = GauActionEnum.EXHAUSTEFFECT;
             }
         }
 
@@ -113,7 +113,7 @@ namespace IngameScript.Domain
             TrySetRotorOrRotors(TORQUE, _rpm);
             if (DoorBlockList == null || DoorBlockList.Count == 0)
             {
-                GAUState = GAUActionEnum.FIRESTATE;
+                GAUState = GauActionEnum.FIRESTATE;
                 return;
             }
             if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) { }
@@ -121,7 +121,7 @@ namespace IngameScript.Domain
             {
                 if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)
                 {
-                    GAUState = GAUActionEnum.FIRESTATE;
+                    GAUState = GauActionEnum.FIRESTATE;
                 }
                 _hangarDoorsTicksToPartialyOpen--;
             }
@@ -130,7 +130,7 @@ namespace IngameScript.Domain
                 OpenDoors();
                 return;
             }
-            GAUState = GAUActionEnum.FIRESTATE;
+            GAUState = GauActionEnum.FIRESTATE;
         }
 
         private void CycleFireState()
@@ -156,14 +156,14 @@ namespace IngameScript.Domain
             if (IsCharged)
             {
                 ExhaustOff();
-                GAUState = GAUActionEnum.READY;
+                GAUState = GauActionEnum.READY;
                 return;
             }
 
             TrySetRotorOrRotors(TORQUENORMAL, -_rpm);
             CloseDoors();
             ToggleBlocks(true, RailgunBlockList);
-            GAUState = GAUActionEnum.CHARGING;
+            GAUState = GauActionEnum.CHARGING;
             ExhaustOff();
         }
 
@@ -172,7 +172,7 @@ namespace IngameScript.Domain
             if (IsAlmostCharged)
             {
                 railgunReloadCheck = null;
-                GAUState = GAUActionEnum.ALMOSTCHARGED;
+                GAUState = GauActionEnum.ALMOSTCHARGED;
             }
         }
 
@@ -180,7 +180,7 @@ namespace IngameScript.Domain
         {
             if (IsCharged)
             {
-                GAUState = GAUActionEnum.READY;
+                GAUState = GauActionEnum.READY;
             }
         }
 
@@ -190,7 +190,7 @@ namespace IngameScript.Domain
             ExhaustOff();
             if (_hasCompletedfirstRun && !IsCharged)
             {
-                GAUState = GAUActionEnum.CHARGE;
+                GAUState = GauActionEnum.CHARGE;
             }
             else
             {
@@ -201,7 +201,7 @@ namespace IngameScript.Domain
         private void FinishSalvoCycle()
         {
             ExhaustOff();
-            GAUState = IsCharged ? GAUActionEnum.READY : GAUActionEnum.CHARGE;
+            GAUState = IsCharged ? GauActionEnum.READY : GauActionEnum.CHARGE;
         }
 
         private bool IsShootTimeOut()

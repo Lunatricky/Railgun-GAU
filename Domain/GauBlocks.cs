@@ -9,7 +9,7 @@ using VRageMath;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
 
         public void GetBlocksIni()
@@ -43,7 +43,6 @@ namespace IngameScript.Domain
             GAUBlockGroup?.GetBlocksOfType(RailgunBlockList);
             GAUBlockGroup?.GetBlocksOfType(DoorBlockList);
             GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
-            GAUBlockGroup?.GetBlocksOfType(LcdBlockList);
 
             if (AreBlocksMissingFromGroupErrorMessage(RailgunBlockList, "Railgun") || AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor")) return;
 
@@ -61,7 +60,7 @@ namespace IngameScript.Domain
                 return;
             }
 
-            SetupSurface(LcdBlockList);
+            RefreshLcds();
 
             List<IMyShipController> myShipControllers = new List<IMyShipController>();
             GAUBlockGroup.GetBlocksOfType(myShipControllers);
@@ -82,21 +81,174 @@ namespace IngameScript.Domain
             ExhaustReset();
         }
 
-        private static void SetupSurface(List<IMyTextSurface> surfaces)
+        public void RefreshLcds()
         {
-            foreach (IMyTextSurfaceProvider surfaceProvider in surfaces)
-            {
-                // Only take the first surface (index 0)
-                if (surfaceProvider.SurfaceCount > 0)
-                {
-                    var surface = surfaceProvider.GetSurface(0);
+            LcdBlockList.Clear();
 
+            if (!string.IsNullOrEmpty(_lcdTag))
+            {
+                List<IMyTextPanel> tagged = new List<IMyTextPanel>();
+                _gridTerminalSystem.GetBlocksOfType(tagged, LcdTagMatch);
+                AddLcdSurfaces(tagged);
+            }
+
+            if (LcdBlockList.Count == 0 && GAUBlockGroup != null)
+            {
+                List<IMyTextPanel> grouped = new List<IMyTextPanel>();
+                GAUBlockGroup.GetBlocksOfType(grouped);
+                AddLcdSurfaces(grouped);
+            }
+
+            SetupSurface(LcdBlockList);
+        }
+
+        bool LcdTagMatch(IMyTextPanel panel)
+        {
+            if (panel == null)
+                return false;
+            if (_customDataProvider != null && !panel.IsSameConstructAs(_customDataProvider))
+                return false;
+            string name = panel.CustomName ?? "";
+            return name.Contains(_lcdTag);
+        }
+
+        void AddLcdSurfaces(List<IMyTextPanel> panels)
+        {
+            for (int i = 0; i < panels.Count; i++)
+            {
+                IMyTextPanel panel = panels[i];
+                if (panel == null)
+                    continue;
+                LcdBlockList.Add(panel);
+            }
+        }
+
+        void SetupSurface(List<IMyTextSurface> surfaces)
+        {
+            for (int i = 0; i < surfaces.Count; i++)
+            {
+                IMyTextSurface surface = surfaces[i];
+                if (surface == null)
+                    continue;
+
+                if (_lcdSprite)
+                {
+                    surface.AddImageToSelection("Online");
+                    surface.RemoveImageFromSelection("Online");
+                    surface.ContentType = ContentType.SCRIPT;
+                    surface.Script = "";
+                }
+                else
+                {
                     surface.ContentType = ContentType.TEXT_AND_IMAGE;
                     surface.Font = "DEBUG";
                     surface.FontSize = 1.7f;
                     surface.Alignment = TextAlignment.LEFT;
                 }
             }
+        }
+
+        public static void TickCockpits(IMyTerminalBlock me, IMyGridTerminalSystem gts, List<Gau> gaus)
+        {
+            s_cockpitSyncTick++;
+            if (s_cockpitSyncTick == 1 || s_cockpitSyncTick % 100 == 1)
+            {
+                bool tagChanged = false;
+                if (me != null)
+                    tagChanged = ParseIni(me);
+                SyncCockpits(me, gts, tagChanged || s_cockpitSyncTick == 1);
+            }
+
+            PaintCockpits(gaus);
+        }
+
+        public static void SyncCockpits(IMyTerminalBlock me, IMyGridTerminalSystem gts, bool forceReload)
+        {
+            s_pb = me;
+            if (gts == null)
+                return;
+
+            s_cockpitScratch.Clear();
+            if (!string.IsNullOrEmpty(CockpitTag))
+                gts.GetBlocksOfType(s_cockpitScratch, CockpitTagMatch);
+
+            s_cockpitSeen.Clear();
+            bool slotsChanged = forceReload;
+            for (int i = 0; i < s_cockpitScratch.Count; i++)
+            {
+                IMyCockpit cockpit = s_cockpitScratch[i];
+                if (cockpit == null)
+                    continue;
+
+                s_cockpitSeen.Add(cockpit.EntityId);
+                GauCockpitSpriteIni cfg = GetCockpitIni(cockpit.EntityId);
+                if (cfg.Sync(cockpit))
+                    slotsChanged = true;
+            }
+
+            List<long> stale = new List<long>();
+            foreach (KeyValuePair<long, GauCockpitSpriteIni> pair in s_cockpitInis)
+            {
+                if (s_cockpitSeen.IndexOf(pair.Key) < 0)
+                    stale.Add(pair.Key);
+            }
+            for (int i = 0; i < stale.Count; i++)
+            {
+                s_cockpitInis.Remove(stale[i]);
+                slotsChanged = true;
+            }
+
+            if (!slotsChanged)
+                return;
+
+            s_cockpitSurfaces.Clear();
+            for (int i = 0; i < s_cockpitScratch.Count; i++)
+            {
+                IMyCockpit cockpit = s_cockpitScratch[i];
+                if (cockpit == null)
+                    continue;
+
+                GauCockpitSpriteIni cfg = GetCockpitIni(cockpit.EntityId);
+                int index;
+                if (!GauCockpitSpriteIni.TryParseSlot(cfg.Lcd, cockpit.SurfaceCount, out index))
+                    continue;
+
+                IMyTextSurface surface = cockpit.GetSurface(index);
+                if (surface == null)
+                    continue;
+
+                SetupCockpitSurface(surface);
+                s_cockpitSurfaces.Add(surface);
+            }
+        }
+
+        static bool CockpitTagMatch(IMyCockpit cockpit)
+        {
+            if (cockpit == null)
+                return false;
+            if (s_pb != null && !cockpit.IsSameConstructAs(s_pb))
+                return false;
+            string name = cockpit.CustomName ?? "";
+            return name.Contains(CockpitTag);
+        }
+
+        static GauCockpitSpriteIni GetCockpitIni(long id)
+        {
+            GauCockpitSpriteIni cfg;
+            if (!s_cockpitInis.TryGetValue(id, out cfg) || cfg == null)
+            {
+                cfg = new GauCockpitSpriteIni();
+                s_cockpitInis[id] = cfg;
+            }
+            return cfg;
+        }
+
+        static void SetupCockpitSurface(IMyTextSurface surface)
+        {
+            surface.AddImageToSelection("Online");
+            surface.RemoveImageFromSelection("Online");
+            surface.ContentType = ContentType.SCRIPT;
+            surface.Script = "";
         }
 
         private void GridSizeSettings()

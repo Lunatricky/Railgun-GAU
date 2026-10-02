@@ -5,7 +5,7 @@ using VRageMath;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         public class Plane
         {

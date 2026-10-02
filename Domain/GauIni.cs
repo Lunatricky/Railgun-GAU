@@ -4,7 +4,7 @@ using VRage.Game.ModAPI.Ingame.Utilities;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         private string IniSectionGAU
         {
@@ -18,6 +18,7 @@ namespace IngameScript.Domain
 
         // Keys
         private const string INI_KEY_GENERAL_GAU_GROUP_TAG = "GAU Group Tag";
+        private const string INI_KEY_GENERAL_COCKPIT_TAG = "Cockpit Tag";
 
         // Sections
         private const string INI_SECTION_GENERAL = "GAU Script General Settings";
@@ -30,13 +31,15 @@ namespace IngameScript.Domain
         private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
         private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
         private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
+        private const string INI_KEY_GAU_LCD_SPRITE = "LCD Sprite";
+        private const string INI_KEY_GAU_LCD_TAG = "LCD Tag";
         private const string REFERENCE_BLOCK_GRID_COORDS = "Reference Grid Coords";
 
         // Sections
         private const string INI_SECTION_GAU_GENERAL = "GAU - Settings";
 
 
-        public static void ParseIni(IMyTerminalBlock customDataProvider)
+        public static bool ParseIni(IMyTerminalBlock customDataProvider)
         {
             s_iniGeneral.Clear();
             string customData = customDataProvider.CustomData;
@@ -51,8 +54,12 @@ namespace IngameScript.Domain
 
 
             GAUGroupTag = s_iniGeneral.Get(section, INI_KEY_GENERAL_GAU_GROUP_TAG).ToString(GAUGroupTag);
+            string cockpitTag = s_iniGeneral.Get(section, INI_KEY_GENERAL_COCKPIT_TAG).ToString(CockpitTag);
+            bool cockpitTagChanged = cockpitTag != CockpitTag;
+            CockpitTag = cockpitTag;
 
             s_iniGeneral.Set(section, INI_KEY_GENERAL_GAU_GROUP_TAG, GAUGroupTag);
+            s_iniGeneral.Set(section, INI_KEY_GENERAL_COCKPIT_TAG, CockpitTag);
 
 
             string output = s_iniGeneral.ToString();
@@ -60,6 +67,7 @@ namespace IngameScript.Domain
             {
                 customDataProvider.CustomData = output;
             }
+            return cockpitTagChanged;
         }
 
         private bool ParseIni()
@@ -85,6 +93,8 @@ namespace IngameScript.Domain
             _targetAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
             _rotationAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
             _doorOpenRatio = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
+            _lcdSprite = s_iniGeneral.Get(sectionName, INI_KEY_GAU_LCD_SPRITE).ToBoolean(_lcdSprite);
+            _lcdTag = s_iniGeneral.Get(sectionName, INI_KEY_GAU_LCD_TAG).ToString(_lcdTag);
             referenceBlockGridCoords = s_iniGeneral.Get(sectionName, REFERENCE_BLOCK_GRID_COORDS).ToString(Vector3ItoString(_referenceBlockGridCoords));
 
             // Get Reference block grid coords from CD
@@ -97,6 +107,9 @@ namespace IngameScript.Domain
             iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
             iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
             iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
+            bool lcdChanged = ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_LCD_SPRITE, _lcdSprite);
+            lcdChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, INI_KEY_GAU_LCD_TAG, _lcdTag);
+            iniAnyChanged |= lcdChanged;
             iniAnyChanged |= ReadAndDetectChange(s_iniGeneral, IniSectionGAU, REFERENCE_BLOCK_GRID_COORDS, referenceBlockGridCoords);
 
             string output = s_iniGeneral.ToString();
@@ -105,6 +118,8 @@ namespace IngameScript.Domain
             {
                 _customDataProvider.CustomData = output;
             }
+            if (lcdChanged)
+                RefreshLcds();
             return iniAnyChanged;
         }
 

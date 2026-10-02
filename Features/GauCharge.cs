@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         private bool IsCharged
         {

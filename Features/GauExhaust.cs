@@ -1,6 +1,6 @@
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
 
             public void TriggerExhaustEffect()

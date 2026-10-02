@@ -2,7 +2,7 @@ using Sandbox.ModAPI.Ingame;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         private bool IsDoorOpen
         {

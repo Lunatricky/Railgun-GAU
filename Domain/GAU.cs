@@ -8,7 +8,7 @@ using VRageMath;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         //Ini
         Dictionary<string, string> __snapshot = new Dictionary<string, string>();
@@ -17,6 +17,7 @@ namespace IngameScript.Domain
 
         public static string GAUGroupTag { get; private set; } = "GAU";
         public static string GAUCustomDataProviderTag { get; private set; } = "GAU Data Provider";
+        public static string CockpitTag { get; private set; } = "[GAU_COCKPIT]";
 
         public StringBuilder Info
         {
@@ -70,7 +71,7 @@ namespace IngameScript.Domain
                 return -1 * anglesPerSecond * _shootDelay;
             }
         }
-        public GAUActionEnum GAUState { get; set; }
+        public GauActionEnum GAUState { get; set; }
         public float RotationAngle { get; set; }
 
         public bool HasWarning { get; private set; } = false;
@@ -82,12 +83,18 @@ namespace IngameScript.Domain
 
         private static MyIni s_iniGeneral = new MyIni();
         private static MyGridProgram s_gridProgram;
-        private static List<GauGeo> s_createdGAUList = new List<GauGeo>();
+        private static List<Gau> s_createdGAUList = new List<Gau>();
+        private static List<IMyTextSurface> s_cockpitSurfaces = new List<IMyTextSurface>();
+        private static Dictionary<long, GauCockpitSpriteIni> s_cockpitInis = new Dictionary<long, GauCockpitSpriteIni>();
+        private static List<IMyCockpit> s_cockpitScratch = new List<IMyCockpit>();
+        private static List<long> s_cockpitSeen = new List<long>();
+        private static IMyTerminalBlock s_pb;
+        private static int s_cockpitSyncTick;
 
         private IMyTerminalBlock _customDataProvider;
         private IMyGridTerminalSystem _gridTerminalSystem;
 
-        private GAUActionEnum _gauTempCommand = GAUActionEnum.NULL;
+        private GauActionEnum _gauTempCommand = GauActionEnum.NULL;
 
         // Outputs
         private StringBuilder _errorBuilder = new StringBuilder();
@@ -136,6 +143,8 @@ namespace IngameScript.Domain
         private int _stepDelayTicks = 2;
         private float _rotationAngle = 10;
         private float _doorOpenRatio = 0.5f;
+        private bool _lcdSprite = false;
+        private string _lcdTag = "[GAU_LCD]";
         private int _hangarDoorsTicksToPartialyOpen = 180;
 
 
@@ -143,7 +152,7 @@ namespace IngameScript.Domain
         private const float TORQUENORMAL = 33600000;
 
 
-        public GauGeo(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null)
+        public Gau(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null)
         {
             _customDataProvider = customDataProvider;
             _gridTerminalSystem = gridTerminalSystem;
@@ -158,9 +167,9 @@ namespace IngameScript.Domain
         }
 
 
-        public static List<GauGeo> AcquireGAUs(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem)
+        public static List<Gau> AcquireGAUs(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem)
         {
-            List<GauGeo> gauList = new List<GauGeo>();
+            List<Gau> gauList = new List<Gau>();
             if (customDataProvider == null) return gauList;
 
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
@@ -169,8 +178,8 @@ namespace IngameScript.Domain
             {
                 try
                 {
-                    GauGeo gau;
-                    gau = new GauGeo(customDataProvider, gridTerminalSystem, group.Name);
+                    Gau gau;
+                    gau = new Gau(customDataProvider, gridTerminalSystem, group.Name);
                     if (gau.IsCreated)
                     {
                         gauList.Add(gau);
@@ -187,9 +196,9 @@ namespace IngameScript.Domain
         }
 
 
-        public static void RunWithTag(string argument, List<GauGeo> gauList, string groupNameTag)
+        public static void RunWithTag(string argument, List<Gau> gauList, string groupNameTag)
         {
-            foreach (GauGeo gau in gauList)
+            foreach (Gau gau in gauList)
             {
                 if (gau._groupName.Contains(groupNameTag))
                 {
@@ -198,31 +207,31 @@ namespace IngameScript.Domain
             }
         }
 
-        private static bool TryParseGauCommand(string input, out GAUActionEnum command)
+        private static bool TryParseGauCommand(string input, out GauActionEnum command)
         {
-            command = GAUActionEnum.NULL;
+            command = GauActionEnum.NULL;
             try
             {
-                command = (GAUActionEnum)Enum.Parse(typeof(GAUActionEnum), input, true);
+                command = (GauActionEnum)Enum.Parse(typeof(GauActionEnum), input, true);
                 return true;
             }
             catch
             {
-                command = GAUActionEnum.RELOAD;
+                command = GauActionEnum.RELOAD;
             }
             return false;
         }
 
         private static void GAURuntimeManager()
         {
-            foreach (GauGeo gau in s_createdGAUList)
+            foreach (Gau gau in s_createdGAUList)
             {
-                if (gau.GAUState == GAUActionEnum.FIRE
-                    || gau.GAUState == GAUActionEnum.FIRESTATE
-                    || gau.GAUState == GAUActionEnum.EXHAUST
-                    || gau.GAUState == GAUActionEnum.EXHAUSTEFFECT
-                    || gau.GAUState == GAUActionEnum.EXHAUSTFIRE
-                    || gau.GAUState == GAUActionEnum.CHARGING)
+                if (gau.GAUState == GauActionEnum.FIRE
+                    || gau.GAUState == GauActionEnum.FIRESTATE
+                    || gau.GAUState == GauActionEnum.EXHAUST
+                    || gau.GAUState == GauActionEnum.EXHAUSTEFFECT
+                    || gau.GAUState == GauActionEnum.EXHAUSTFIRE
+                    || gau.GAUState == GauActionEnum.CHARGING)
                 {
                     s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     return;
@@ -266,15 +275,15 @@ namespace IngameScript.Domain
                 iniAnyChanged = ParseIni();
             }
 
-            if (GAUActionEnum.FIRE != _gauTempCommand &&
-                GAUActionEnum.EXHAUST != _gauTempCommand &&
-                GAUActionEnum.FIRESTATE != _gauTempCommand &&
-                GAUActionEnum.EXHAUSTEFFECT != _gauTempCommand &&
-                GAUActionEnum.EXHAUSTFIRE != _gauTempCommand &&
-                GAUActionEnum.CHARGING != _gauTempCommand &&
+            if (GauActionEnum.FIRE != _gauTempCommand &&
+                GauActionEnum.EXHAUST != _gauTempCommand &&
+                GauActionEnum.FIRESTATE != _gauTempCommand &&
+                GauActionEnum.EXHAUSTEFFECT != _gauTempCommand &&
+                GauActionEnum.EXHAUSTFIRE != _gauTempCommand &&
+                GauActionEnum.CHARGING != _gauTempCommand &&
                 iniAnyChanged)
             {
-                GAUState = GAUActionEnum.RELOAD;
+                GAUState = GauActionEnum.RELOAD;
                 iniAnyChanged = false;
                 return;
             }
@@ -288,66 +297,66 @@ namespace IngameScript.Domain
 
             GAURuntimeManager(); // Modify Runtime
 
-            if (GAUActionEnum.OFF == GAUState && GAUActionEnum.ON != _gauTempCommand)
+            if (GauActionEnum.OFF == GAUState && GauActionEnum.ON != _gauTempCommand)
             {
                 return;
             }
 
-            if (GAUActionEnum.NULL != _gauTempCommand &&
-                GAUActionEnum.CHARGING != GAUState &&
-                GAUActionEnum.ALMOSTCHARGED != GAUState)
+            if (GauActionEnum.NULL != _gauTempCommand &&
+                GauActionEnum.CHARGING != GAUState &&
+                GauActionEnum.ALMOSTCHARGED != GAUState)
             {
                 GAUState = _gauTempCommand;
-                _gauTempCommand = GAUActionEnum.NULL;
+                _gauTempCommand = GauActionEnum.NULL;
             }
-            else if ((GAUActionEnum.FIRE == _gauTempCommand ||
-                     GAUActionEnum.EXHAUST == _gauTempCommand) &&
+            else if ((GauActionEnum.FIRE == _gauTempCommand ||
+                     GauActionEnum.EXHAUST == _gauTempCommand) &&
                      tempRailgunListIsCharging.Count < RailgunBlockList.Count)
             {
                 GAUState = _gauTempCommand;
-                _gauTempCommand = GAUActionEnum.NULL;
+                _gauTempCommand = GauActionEnum.NULL;
                 return;
             }
 
             switch (GAUState)
             {
-                case GAUActionEnum.ON:
-                case GAUActionEnum.RELOAD:
+                case GauActionEnum.ON:
+                case GauActionEnum.RELOAD:
                     CycleOnOrReload();
                     break;
 
-                case GAUActionEnum.OFF:
+                case GauActionEnum.OFF:
                     CycleOff();
                     break;
 
-                case GAUActionEnum.EXHAUST:
+                case GauActionEnum.EXHAUST:
                     CycleExhaust();
                     break;
 
-                case GAUActionEnum.EXHAUSTEFFECT:
+                case GauActionEnum.EXHAUSTEFFECT:
                     CycleExhaustEffect();
                     break;
 
-                case GAUActionEnum.EXHAUSTFIRE:
+                case GauActionEnum.EXHAUSTFIRE:
                     CycleExhaustFire();
                     break;
 
-                case GAUActionEnum.FIRE:
+                case GauActionEnum.FIRE:
                     CycleFire();
                     break;
 
-                case GAUActionEnum.FIRESTATE:
+                case GauActionEnum.FIRESTATE:
                     CycleFireState();
                     break;
 
-                case GAUActionEnum.CHARGE:
+                case GauActionEnum.CHARGE:
                     CycleCharge();
                     break;
 
-                case GAUActionEnum.CHARGING:
+                case GauActionEnum.CHARGING:
                     CycleCharging();
                     break;
-                case GAUActionEnum.ALMOSTCHARGED:
+                case GauActionEnum.ALMOSTCHARGED:
                     CycleAlmostCharged();
                     break;
 

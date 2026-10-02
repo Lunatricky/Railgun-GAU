@@ -13,7 +13,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        private List<GauGeo> _gauList = new List<GauGeo>();
+        private List<Gau> _gauList = new List<Gau>();
 
         // CommandLine Commands
         public const string CL_COMMAND_ON = "ON";
@@ -34,24 +34,22 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             me = Me;
-            GauGeo.ParseIni(me); // Parse general settings
-            GauGeo.TryRegisterGridProgram(this); // enable runtime modification
-            _gauList = GauGeo.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
+            Gau.ParseIni(me); // Parse general settings
+            Gau.TryRegisterGridProgram(this); // enable runtime modification
+            _gauList = Gau.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
             if (string.IsNullOrWhiteSpace(argument))
             {
-                foreach (GauGeo gau in _gauList)
+                foreach (Gau gau in _gauList)
                 {
                     gau.Run(me);
                     Echo(gau.Info.ToString());
-                    foreach(IMyTextSurface surface in gau.LcdBlockList)
-                    {
-                        surface.WriteText(gau.Info);
-                    }
+                    gau.PaintLcds();
                 }
+                Gau.TickCockpits(me, GridTerminalSystem, _gauList);
                 Echo(GetRuntimeInfo());
                 return;
             }
@@ -100,11 +98,11 @@ namespace IngameScript
 
             if (!string.IsNullOrWhiteSpace(groupName))
             {
-                GauGeo.RunWithTag(command, _gauList, groupName);
+                Gau.RunWithTag(command, _gauList, groupName);
             }
             else
             {
-                foreach (GauGeo gau in _gauList)
+                foreach (Gau gau in _gauList)
                 {
                     gau.Run(command);
                 }

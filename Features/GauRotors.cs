@@ -5,7 +5,7 @@ using VRageMath;
 
 namespace IngameScript.Domain
 {
-    partial class GauGeo
+    partial class Gau
     {
         private void ConfigureGAURotors(IMyMotorStator motorStator, float torque, float targetVelocityRPM)
         {
