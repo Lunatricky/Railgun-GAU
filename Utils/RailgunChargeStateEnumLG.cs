@@ -1,8 +1,8 @@
-﻿namespace IngameScript
+namespace IngameScript
 {
     partial class RailgunChargeStateEnumLG
     {
-        public const string ALMOST = "Stored power: 4";
-        public const string CHARGED = "Stored power: 500";
+        public const string ALMOST = "Stored Power: 4";
+        public const string CHARGED = "Stored Power: 500";
     }
 }

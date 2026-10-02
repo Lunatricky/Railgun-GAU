@@ -1,34 +1,24 @@
-﻿using Sandbox.Game.EntityComponents;
-using Sandbox.ModAPI.Ingame;
-using Sandbox.ModAPI.Interfaces;
-using SpaceEngineers.Game.ModAPI.Ingame;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Text;
-using VRage;
-using VRage.Collections;
-using VRage.Game;
-using VRage.Game.Components;
-using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame;
-using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Game.ObjectBuilders.Definitions;
-using VRageMath;
 using IngameScript.Utils;
+using Sandbox.ModAPI.Ingame;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using VRage.Game.ModAPI.Ingame.Utilities;
+using VRageMath;
 
 namespace IngameScript.Domain
 {
-    partial class GAU
+    partial class Gau
     {
-        #region Properties
-        #region Static
+        //Ini
+        Dictionary<string, string> __snapshot = new Dictionary<string, string>();
+        bool iniAnyChanged = false;
+        int tickCount;
+
         public static string GAUGroupTag { get; private set; } = "GAU";
         public static string GAUCustomDataProviderTag { get; private set; } = "GAU Data Provider";
+        public static string CockpitTag { get; private set; } = "[GAU_COCKPIT]";
 
-        #endregion Static
         public StringBuilder Info
         {
             get
@@ -81,123 +71,30 @@ namespace IngameScript.Domain
                 return -1 * anglesPerSecond * _shootDelay;
             }
         }
-        public GAUActionEnum GAUState { get; set; }
+        public GauActionEnum GAUState { get; set; }
         public float RotationAngle { get; set; }
-
-        private bool IsCharged
-        {
-            get
-            {
-                bool isCharged = false;
-                int chargedCounter = 0;
-
-                if (tempRailgunListIsCharged.Count == 0)
-                {
-                    tempRailgunListIsCharged = new List<IMySmallMissileLauncherReload>(RailgunBlockList);
-                }
-
-                for (int i = tempRailgunListIsCharged.Count - 1; i >= 0; i--)
-                {
-                    var railgun = tempRailgunListIsCharged[i];
-                    int checkCounter = CheckCounter(chargedCounter, railgun, _railGunChargeStateDetailedInfoString);
-
-                    if (checkCounter != chargedCounter)
-                    {
-                        chargedCounter = checkCounter;
-                        railgun.Enabled = false;
-                        tempRailgunListIsCharged.RemoveAt(i); // Safe in reverse
-                    }
-                }
-
-                if (tempRailgunListIsCharged.Count == 0)
-                {
-                    isCharged = true;
-                }
-
-                return isCharged;
-            }
-        }
-
-        private bool IsAlmostCharged
-        {
-            get
-            {
-                bool result = false;
-
-                if (!IsBlockMissing(railgunReloadCheck))
-                {
-                    return railgunReloadCheck.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString);
-                }
-                else
-                {
-                    foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
-                    {
-                        result = railgun.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString);
-                    }
-                }
-                return result;
-            }
-        }
-
-        private bool IsDoorOpen
-        {
-            get
-            {
-                bool isDoorOpen = true;
-                foreach (IMyDoor door in DoorBlockList)
-                {
-                    if (door.Enabled == true)
-                    {
-                        isDoorOpen = false;
-                    }
-                }
-                return isDoorOpen;
-            }
-        }
-
-        private bool IsDoorAlmostOpen
-        {
-            get
-            {
-                bool IsDoorAlmostOpen = false;
-                foreach (IMyDoor door in DoorBlockList)
-                {
-                    float almostOpenRatio = isLG ? _doorOpenRatio - 0.3f : _doorOpenRatio - 0.1f;
-                    if (almostOpenRatio < door.OpenRatio)
-                    {
-                        IsDoorAlmostOpen = true;
-                    }
-                }
-                return IsDoorAlmostOpen;
-            }
-        }
 
         public bool HasWarning { get; private set; } = false;
         public bool IsCreated { get; private set; }
 
         public IMyMotorStator GAUCenterBlock { get; private set; }
 
-        private string IniSectionGAU
-        {
-            get
-            {
-                return $"{INI_SECTION_GAU_GENERAL} - {_id}";
-            }
-        }
-        #endregion Properties
 
-        #region Fields
 
-        #region Static
         private static MyIni s_iniGeneral = new MyIni();
         private static MyGridProgram s_gridProgram;
-        private static List<GAU> s_createdGAUList = new List<GAU>();
-        #endregion Static
+        private static List<Gau> s_createdGAUList = new List<Gau>();
+        private static List<IMyTextSurface> s_cockpitSurfaces = new List<IMyTextSurface>();
+        private static Dictionary<long, GauCockpitSpriteIni> s_cockpitInis = new Dictionary<long, GauCockpitSpriteIni>();
+        private static List<IMyCockpit> s_cockpitScratch = new List<IMyCockpit>();
+        private static List<long> s_cockpitSeen = new List<long>();
+        private static IMyTerminalBlock s_pb;
+        private static int s_cockpitSyncTick;
 
         private IMyTerminalBlock _customDataProvider;
         private IMyGridTerminalSystem _gridTerminalSystem;
 
-        private GAUActionEnum _gauTempCommand = GAUActionEnum.NULL;
+        private GauActionEnum _gauTempCommand = GauActionEnum.NULL;
 
         // Outputs
         private StringBuilder _errorBuilder = new StringBuilder();
@@ -211,7 +108,7 @@ namespace IngameScript.Domain
         private string _railGunChargeStateDetailedInfoString = "";
         private bool isLG;
         private bool _hasCompletedfirstRun = false;
-        private float _originPlaneAngleOffset = 0;
+        private float _originPlaneAngleOffset;
 
         private Vector3I _circleCenter = new Vector3I();
         private Vector3I _circleCenter2 = new Vector3I();
@@ -220,7 +117,7 @@ namespace IngameScript.Domain
         private IMySmallMissileLauncherReload railgunReloadCheck;
 
         private List<IMySmallMissileLauncherReload> tempRailgunListShootSalvo = new List<IMySmallMissileLauncherReload>();
-        private List<IMySmallMissileLauncherReload> tempRailgunListIsCharged = new List<IMySmallMissileLauncherReload>();
+        private List<IMySmallMissileLauncherReload> tempRailgunListIsCharging = new List<IMySmallMissileLauncherReload>();
         private List<IMySmallMissileLauncherReload> tempRailgunListOff = new List<IMySmallMissileLauncherReload>();
 
 
@@ -244,47 +141,18 @@ namespace IngameScript.Domain
         private string _rotorName = "GAU Rotor";
         private string _exhaustTag = "Exhaust";
         private int _stepDelayTicks = 2;
-        private float _rotationAngle = 5;
-        private float _doorOpenRatio = 0.6f;
+        private float _rotationAngle = 10;
+        private float _doorOpenRatio = 0.5f;
+        private bool _lcdSprite = false;
+        private string _lcdTag = "[GAU_LCD]";
         private int _hangarDoorsTicksToPartialyOpen = 180;
-        #endregion Fields
 
-        #region Constants
-
-        #region Ini
-
-        #region Static
-
-
-
-        // Keys
-        private const string INI_KEY_GENERAL_GAU_GROUP_TAG = "GAU Group Tag";
-
-        // Sections
-        private const string INI_SECTION_GENERAL = "GAU Script General Settings";
-        #endregion Static
-
-        // Keys
-        private const string INI_KEY_GAU_RPM = "RPM";
-        private const string INI_KEY_GAU_MAIN_ROTOR_NAME = "Rotor Name";
-        private const string INI_KEY_GAU_EXHAUST_TAG = "Exhaust Tag";
-        private const string INI_KEY_GAU_STEP_DELAY_TICKS = "Step Delay Ticks";
-        private const string INI_KEY_GAU_TARGET_ANGLE = "Target Angle";
-        private const string INI_KEY_GAU_ROTATION_ANGLE = "Angle Offset";
-        private const string INI_KEY_GAU_DOOR_OPEN_RATIO = "Door Open Ratio";
-        private const string REFERENCE_BLOCK_GRID_COORDS = "Reference Grid Coords";
-
-        // Sections
-        private const string INI_SECTION_GAU_GENERAL = "GAU - Settings";
-        #endregion Ini
 
         private const float TORQUE = 100000000000f;
         private const float TORQUENORMAL = 33600000;
 
-        #endregion Constants
 
-        #region Constructors
-        public GAU(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null)
+        public Gau(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem, string id = null)
         {
             _customDataProvider = customDataProvider;
             _gridTerminalSystem = gridTerminalSystem;
@@ -297,250 +165,11 @@ namespace IngameScript.Domain
 
             IsCreated = true;
         }
-        #endregion Constructors
 
-        #region Init
 
-        public void GetBlocksIni()
+        public static List<Gau> AcquireGAUs(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem)
         {
-            //TODO don't pass grid terminal system, pass groups to GAU class instead
-            GAUBlockGroup = _gridTerminalSystem.GetBlockGroupWithName(_groupName);
-            GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
-
-            if (AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor"))
-            {
-                return;
-            }
-
-            if (!(RotorBlockList.Count == 1 || RotorBlockList.Count == 2))
-            {
-                _errorBuilder.Append("\n" + $"Scrip only works with 1 or 2 rotors no more no less");
-                return;
-            }
-
-            if (!TrySetRotorOrRotors(TORQUENORMAL, -_rpm))
-            {
-                _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
-                return;
-            }
-        }
-
-        public void GetBlocksGeneric()
-        {
-            //TODO don't pass grid terminal system, pass groups to GAU class instead
-            GAUBlockGroup = _gridTerminalSystem.GetBlockGroupWithName(_groupName);
-            GAUBlockGroup?.GetBlocksOfType(RailgunBlockList);
-            GAUBlockGroup?.GetBlocksOfType(DoorBlockList);
-            GAUBlockGroup?.GetBlocksOfType(RotorBlockList);
-            GAUBlockGroup?.GetBlocksOfType(LcdBlockList);
-
-            if (AreBlocksMissingFromGroupErrorMessage(RailgunBlockList, "Railgun") || AreBlocksMissingFromGroupErrorMessage(RotorBlockList, "Rotor")) return;
-
-            AreBlocksMissingFromGroupWarningMessage(DoorBlockList, "Door");
-
-            if (!(RotorBlockList.Count == 1 || RotorBlockList.Count == 2))
-            {
-                _errorBuilder.Append("\n" + $"Scrip only works with 1 or 2 rotors no more no less");
-                return;
-            }
-
-            if (!TrySetRotorOrRotors(TORQUENORMAL, -_rpm))
-            {
-                _errorBuilder.Append("\n" + $"No rotor named {_rotorName} found in group");
-                return;
-            }
-
-            SetupSurface(LcdBlockList);
-
-            List<IMyShipController> myShipControllers = new List<IMyShipController>();
-            GAUBlockGroup.GetBlocksOfType(myShipControllers);
-
-            if (AreBlocksMissingFromGroupErrorMessage(myShipControllers, "ShipControllers"))
-            {
-                return;
-            }
-
-            //TODO save _referenceBlockOrientation and _referenceBlockGridCoords in  custom data
-            _referenceBlock = myShipControllers.First();
-            _referenceBlockOrientation = _referenceBlock.Orientation; 
-            _referenceBlockGridCoords = _referenceBlock.Position;
-
-            Initialize();
-            SetVectorOffsets();
-            GridSizeSettings();
-            ExhaustReset();
-        }
-
-        private static void SetupSurface(List<IMyTextSurface> surfaces)
-        {
-            foreach (IMyTextSurfaceProvider surfaceProvider in surfaces)
-            {
-                // Only take the first surface (index 0)
-                if (surfaceProvider.SurfaceCount > 0)
-                {
-                    var surface = surfaceProvider.GetSurface(0);
-
-                    surface.ContentType = ContentType.TEXT_AND_IMAGE;
-                    surface.Font = "DEBUG";
-                    surface.FontSize = 1.7f;
-                    surface.Alignment = TextAlignment.LEFT;
-                }
-            }
-        }
-
-        private void GridSizeSettings()
-        {
-            isLG = RailgunBlockList.First().CubeGrid.GridSizeEnum.Equals(MyCubeSize.Large);
-
-            _railGunChargeStateDetailedInfoString = (isLG ? RailgunChargeStateEnumLG.CHARGED : RailgunChargeStateEnumSG.CHARGED);
-
-            _shootDelay = (isLG ? InGameValues.LG : InGameValues.SG);
-
-            if (_rotationAngle == 0)
-            {
-                _rotationAngle = (isLG ? InGameValues.rotationAngleLG : InGameValues.rotationAngleSG);
-            }
-
-            _originPlaneAngleOffset = ShootDelayOffsetAngle;
-            _fireDelay = _shootDelay * 60;
-        }
-
-        public void Initialize()
-        {
-            Vector3D referenceBlockWorldCoords = GetWorldPosition(_referenceBlockGridCoords);
-            // Collect all exhaust caps
-            List<IMyFunctionalBlock> allExhausts = new List<IMyFunctionalBlock>();
-            GAUBlockGroup?.GetBlocksOfType<IMyFunctionalBlock>(allExhausts, b => b.CustomName.Contains(_exhaustTag));
-
-            // Build a list of exhausts + distances
-            List<IMyFunctionalBlock> sortedExhausts = new List<IMyFunctionalBlock>(allExhausts);
-            sortedExhausts.Sort(delegate (IMyFunctionalBlock a, IMyFunctionalBlock b)
-            {
-                double da = Vector3D.Distance(referenceBlockWorldCoords, a.GetPosition());
-                double db = Vector3D.Distance(referenceBlockWorldCoords, b.GetPosition());
-                return da.CompareTo(db);
-            });
-
-            // Group exhausts by approximate distance
-            exhaustLists.Clear();
-            foreach (IMyFunctionalBlock sortedExhaust in sortedExhausts)
-            {
-                double dist = Vector3D.Distance(referenceBlockWorldCoords, sortedExhaust.GetPosition());
-                bool placed = false;
-
-                foreach (List<IMyFunctionalBlock> exhaustList in exhaustLists)
-                {
-                    double groupDist = Vector3D.Distance(referenceBlockWorldCoords, exhaustList[0].GetPosition());
-                    if (Math.Abs(groupDist - dist) < _groupTolerance)
-                    {
-                        exhaustList.Add(sortedExhaust);
-                        placed = true;
-                        break;
-                    }
-                }
-
-                if (!placed)
-                {
-                    List<IMyFunctionalBlock> newGroup = new List<IMyFunctionalBlock>();
-                    newGroup.Add(sortedExhaust);
-                    exhaustLists.Add(newGroup);
-                }
-            }
-
-            _state = 0;
-            _tickCounter = 0;
-        }
-
-        private void ConfigureGAURotors(IMyMotorStator motorStator, float torque, float targetVelocityRPM)
-        {
-            motorStator.Torque = torque;
-            motorStator.BrakingTorque = torque;
-            motorStator.TargetVelocityRPM = targetVelocityRPM;
-            motorStator.UpperLimitRad = 0;
-            GAUCenterBlock = motorStator;
-            if (_circleCenter == new Vector3I())
-            {
-                _circleCenter = GAUCenterBlock.Position;
-            }
-        }
-
-        public bool TrySetRotorOrRotors(float torque)
-        {
-            return TrySetRotorOrRotors(torque, _rpm);
-        }
-
-            public bool TrySetRotorOrRotors(float torque, float _rpm)
-        {
-            bool MainRotorExists = false;
-
-            if (RotorBlockList.Count == 1)
-            {
-                ConfigureGAURotors(RotorBlockList.First(), torque, _rpm);
-                MainRotorExists = true;
-            }
-            else
-            {
-                foreach (IMyMotorStator rotor in RotorBlockList)
-                {
-                    if (rotor.CustomName.ToLower().Contains(_rotorName.ToLower()))
-                    {
-                        ConfigureGAURotors(rotor, torque, _rpm);
-                        MainRotorExists = true;
-                    }
-                    else
-                    {
-                        ConfigureGAURotors(rotor, torque, -_rpm);
-                    }
-                }
-            }
-            return MainRotorExists;
-        }
-
-        // This is a weird method, maybe use an out variable for the message instead?
-        private bool AreBlocksMissingFromGroupErrorMessage<T>(List<T> list, string blockType)
-        {
-            if (list?.Count == 0)
-            {
-                _errorBuilder.Append("\n" + $"No {blockType} block found in group");
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        // This is a weird method, maybe use an out variable for the message instead?
-        private bool AreBlocksMissingFromGroupWarningMessage<T>(List<T> list, string blockType)
-        {
-            if (list?.Count == 0)
-            {
-                _warningBuilder.Append("\n" + $"No {blockType} block found in group");
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        private void SetVectorOffsets()
-        {
-            if (_referenceBlockOrientation == null ||(_circleCenter2 != new Vector3I() && _thridPoint != new Vector3I()))
-            {
-                return;
-            }
-
-            _circleCenter2 = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Forward);
-            _thridPoint = _circleCenter - Base6Directions.GetIntVector(_referenceBlockOrientation.Up);
-        }
-        #endregion Init
-
-        #region Gau Factory
-
-        public static List<GAU> AcquireGAUs(IMyTerminalBlock customDataProvider, IMyGridTerminalSystem gridTerminalSystem)
-        {
-            List<GAU> gauList = new List<GAU>();
+            List<Gau> gauList = new List<Gau>();
             if (customDataProvider == null) return gauList;
 
             List<IMyBlockGroup> groups = new List<IMyBlockGroup>();
@@ -549,8 +178,8 @@ namespace IngameScript.Domain
             {
                 try
                 {
-                    GAU gau;
-                    gau = new GAU(customDataProvider, gridTerminalSystem, group.Name);
+                    Gau gau;
+                    gau = new Gau(customDataProvider, gridTerminalSystem, group.Name);
                     if (gau.IsCreated)
                     {
                         gauList.Add(gau);
@@ -565,14 +194,11 @@ namespace IngameScript.Domain
             }
             return gauList;
         }
-        #endregion Gau Factory
 
-        #region Gau Primary Methods
-        #region Static
 
-        public static void RunWithTag(string argument, List<GAU> gauList, string groupNameTag)
+        public static void RunWithTag(string argument, List<Gau> gauList, string groupNameTag)
         {
-            foreach (GAU gau in gauList)
+            foreach (Gau gau in gauList)
             {
                 if (gau._groupName.Contains(groupNameTag))
                 {
@@ -580,37 +206,32 @@ namespace IngameScript.Domain
                 }
             }
         }
-        private static void ShootRailgun(IMySmallMissileLauncherReload railgun)
-        {
-            railgun.Enabled = true;
-            railgun.ShootOnce();
-        }
 
-        private static bool TryParseGauCommand(string input, out GAUActionEnum command)
+        private static bool TryParseGauCommand(string input, out GauActionEnum command)
         {
-            command = GAUActionEnum.NULL;
+            command = GauActionEnum.NULL;
             try
             {
-                command = (GAUActionEnum)Enum.Parse(typeof(GAUActionEnum), input, true);
+                command = (GauActionEnum)Enum.Parse(typeof(GauActionEnum), input, true);
                 return true;
             }
             catch
             {
-                command = GAUActionEnum.RELOAD;
+                command = GauActionEnum.RELOAD;
             }
             return false;
         }
 
         private static void GAURuntimeManager()
         {
-            foreach (GAU gau in s_createdGAUList)
+            foreach (Gau gau in s_createdGAUList)
             {
-                if (gau.GAUState == GAUActionEnum.FIRE
-                    || gau.GAUState == GAUActionEnum.FIRESTATE
-                    || gau.GAUState == GAUActionEnum.EXHAUST
-                    || gau.GAUState == GAUActionEnum.EXHAUSTEFFECT
-                    || gau.GAUState == GAUActionEnum.EXHAUSTFIRE
-                    || gau.GAUState == GAUActionEnum.CHARGING)
+                if (gau.GAUState == GauActionEnum.FIRE
+                    || gau.GAUState == GauActionEnum.FIRESTATE
+                    || gau.GAUState == GauActionEnum.EXHAUST
+                    || gau.GAUState == GauActionEnum.EXHAUSTEFFECT
+                    || gau.GAUState == GauActionEnum.EXHAUSTFIRE
+                    || gau.GAUState == GauActionEnum.CHARGING)
                 {
                     s_gridProgram.Runtime.UpdateFrequency = UpdateFrequency.Update1;
                     return;
@@ -631,10 +252,7 @@ namespace IngameScript.Domain
             }
         }
 
-        #endregion Static
 
-        #region Non-Static
-        #region Run
 
         public void Run(string argument)
         {
@@ -643,9 +261,6 @@ namespace IngameScript.Domain
 
         public void Run(IMyProgrammableBlock me, string argument = "")
         {
-
-            GAURuntimeManager(); // Modify Runtime
-
             _statusBuilder.Clear();
             _statusBuilder.AppendLine($"ID: {_id}");
             _statusBuilder.AppendLine($"Cycle: {GAUState}");
@@ -653,253 +268,105 @@ namespace IngameScript.Domain
             StringBuilder scriptInfo = InfoString();
 
             _statusBuilder.AppendLine($"{scriptInfo}");
+
+            tickCount++;
+            if (tickCount % 100 == 1)
+            {
+                iniAnyChanged = ParseIni();
+            }
+
+            if (GauActionEnum.FIRE != _gauTempCommand &&
+                GauActionEnum.EXHAUST != _gauTempCommand &&
+                GauActionEnum.FIRESTATE != _gauTempCommand &&
+                GauActionEnum.EXHAUSTEFFECT != _gauTempCommand &&
+                GauActionEnum.EXHAUSTFIRE != _gauTempCommand &&
+                GauActionEnum.CHARGING != _gauTempCommand &&
+                iniAnyChanged)
+            {
+                GAUState = GauActionEnum.RELOAD;
+                iniAnyChanged = false;
+                return;
+            }
             if (me != null) me.GetSurface(0).WriteText(scriptInfo.ToString());
 
             if (argument != null && argument.Length != 0 && argument != "")
             {
-                if (!TryParseGauCommand(argument, out _gauTempCommand))
-                {
-                    GAUState = GAUActionEnum.RELOAD;
-                }
+                TryParseGauCommand(argument, out _gauTempCommand);
+                return;
             }
 
-            if (GAUActionEnum.OFF == GAUState && GAUActionEnum.ON != _gauTempCommand)
+            GAURuntimeManager(); // Modify Runtime
+
+            if (GauActionEnum.OFF == GAUState && GauActionEnum.ON != _gauTempCommand)
             {
                 return;
             }
 
-            if (GAUActionEnum.NULL != _gauTempCommand &&
-                GAUActionEnum.CHARGING != GAUState &&
-                GAUActionEnum.ALMOSTCHARGED != GAUState
-                )
+            if (GauActionEnum.NULL != _gauTempCommand &&
+                GauActionEnum.CHARGING != GAUState &&
+                GauActionEnum.ALMOSTCHARGED != GAUState)
             {
                 GAUState = _gauTempCommand;
-                _gauTempCommand = GAUActionEnum.NULL;
+                _gauTempCommand = GauActionEnum.NULL;
             }
-            else if (GAUActionEnum.FIRE == _gauTempCommand ||
-                     GAUActionEnum.EXHAUST == _gauTempCommand)
+            else if ((GauActionEnum.FIRE == _gauTempCommand ||
+                     GauActionEnum.EXHAUST == _gauTempCommand) &&
+                     tempRailgunListIsCharging.Count < RailgunBlockList.Count)
             {
-                _gauTempCommand = GAUActionEnum.NULL;
+                GAUState = _gauTempCommand;
+                _gauTempCommand = GauActionEnum.NULL;
+                return;
             }
 
             switch (GAUState)
             {
-                case GAUActionEnum.ON:
-                case GAUActionEnum.RELOAD:
-                    GetBlocksGeneric();
-                    ParseIni();
-                    GetBlocksIni();
-                    ToggleBlocks(true, RotorBlockList);
-                    ToggleBlocks(false, RailgunBlockList);
-
-                    if (IsCharged)
-                    {
-                        GAUState = GAUActionEnum.READY;
-                    }
-                    else
-                    {
-                        GAUState = GAUActionEnum.CHARGE;
-                    }
+                case GauActionEnum.ON:
+                case GauActionEnum.RELOAD:
+                    CycleOnOrReload();
                     break;
 
-                case GAUActionEnum.OFF:
-                    if (IsCharged)
-                        Off();
+                case GauActionEnum.OFF:
+                    CycleOff();
                     break;
 
-                case GAUActionEnum.EXHAUST:
-                    _shootTimeout = 0;
-                    TrySetRotorOrRotors(TORQUE, _rpm);
-                    if (!IsDoorAlmostOpen)
-                    {
-                        OpenDoors();
-                        break;
-                    }
-                    ExhaustReset();
-                    if (_fireDelay > _exhaustEffectDelay)
-                    {
-                        GAUState = GAUActionEnum.EXHAUSTFIRE;
-                    }
-                    else
-                    {
-                        GAUState = GAUActionEnum.EXHAUSTEFFECT;
-                    }
+                case GauActionEnum.EXHAUST:
+                    CycleExhaust();
                     break;
 
-                case GAUActionEnum.EXHAUSTEFFECT:
-                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
-                    {
-                        GAUState = GAUActionEnum.CHARGE;
-                        break;
-                    }
-
-                    _shootTimeout++;
-
-                    if (!IsDoorOpen)
-                    {
-                        OpenDoors();
-                    }
-                    TriggerExhaustEffect();
-                    if (_fireDelay > _exhaustEffectDelay)
-                    {
-                        RailgunShootSalvo();
-                    }
-                    else
-                    {
-                        _exhaustEffectDelay--;
-                    }
+                case GauActionEnum.EXHAUSTEFFECT:
+                    CycleExhaustEffect();
                     break;
 
-                case GAUActionEnum.EXHAUSTFIRE:
-                    if (_shootTimeout > 4 * 60 * 60 / Math.Abs(_rpm))
-                    {
-                        GAUState = GAUActionEnum.CHARGE;
-                        break;
-                    }
-
-                    _shootTimeout++;
-
-                    if (!IsDoorOpen)
-                    {
-                        OpenDoors();
-                    }
-                    RailgunShootSalvo();
-                    if (_fireDelay < _exhaustEffectDelay)
-                    {
-                        TriggerExhaustEffect();
-                    }
-                    else
-                    {
-                        _fireDelay--;
-                    }
+                case GauActionEnum.EXHAUSTFIRE:
+                    CycleExhaustFire();
                     break;
 
-                case GAUActionEnum.FIRE:
-                    _shootTimeout = 0;
-                    TrySetRotorOrRotors(TORQUE, _rpm);
-                    if (DoorBlockList == null || DoorBlockList.Count == 0)
-                    {
-                        GAUState = GAUActionEnum.FIRESTATE;
-                        break;
-                    }
-                    if (isLG && DoorBlockList.First() is IMyAirtightSlideDoor || DoorBlockList.Count == 0) { }
-                    else if (isLG && DoorBlockList.First() is IMyAirtightHangarDoor)
-                    {
-                        if (_shootDelay >= _hangarDoorsTicksToPartialyOpen)
-                        {
-                            GAUState = GAUActionEnum.FIRESTATE;
-                        }
-                        _hangarDoorsTicksToPartialyOpen--;
-                    }
-                    else if (!IsDoorAlmostOpen)
-                    {
-                        OpenDoors();
-                        break;
-                    }
-                    GAUState = GAUActionEnum.FIRESTATE;
+                case GauActionEnum.FIRE:
+                    CycleFire();
                     break;
 
-                case GAUActionEnum.FIRESTATE:
-                    if (_shootTimeout > 2 * 60 * 60 / Math.Abs(_rpm))
-                    {
-                        GAUState = GAUActionEnum.CHARGE;
-                        break;
-                    }
-
-                    _shootTimeout++;
-
-                    _hangarDoorsTicksToPartialyOpen = 180;
-                    if (!IsDoorOpen)
-                    {
-                        OpenDoors();
-                    }
-                    RailgunShootSalvo();
+                case GauActionEnum.FIRESTATE:
+                    CycleFireState();
                     break;
 
-                case GAUActionEnum.CHARGE:
-                    TrySetRotorOrRotors(TORQUENORMAL, -_rpm);
-                    CloseDoors();
-                    ToggleBlocks(true, RailgunBlockList);
-                    GAUState = GAUActionEnum.CHARGING;
-                    ExhaustOff();
+                case GauActionEnum.CHARGE:
+                    CycleCharge();
                     break;
 
-                case GAUActionEnum.CHARGING:
-                    if (IsAlmostCharged)
-                    {
-                        railgunReloadCheck = null;
-                        GAUState = GAUActionEnum.ALMOSTCHARGED;
-                    }
+                case GauActionEnum.CHARGING:
+                    CycleCharging();
                     break;
-                case GAUActionEnum.ALMOSTCHARGED:
-                    if (IsCharged)
-                    {
-                        GAUState = GAUActionEnum.READY;
-                    }
+                case GauActionEnum.ALMOSTCHARGED:
+                    CycleAlmostCharged();
                     break;
 
                 default:
-                    CloseDoors();
-                    ExhaustOff();
-                    if (_hasCompletedfirstRun && !IsCharged)
-                    {
-                        GAUState = GAUActionEnum.CHARGE;
-                    }
-                    else
-                    {
-                        ToggleBlocks(false, RailgunBlockList);
-                    }
+                    CycleDefault();
                     break;
             }
 
             _hasCompletedfirstRun = true;
         }
-
-        private StringBuilder InfoString()
-        {
-            StringBuilder _infoString = new StringBuilder();
-            _infoString.AppendLine(new string('-', 28));
-            _infoString.AppendLine(_groupName);
-            _infoString.AppendLine("Railguns:");
-
-            int workingRailguns = 0;
-            foreach (IMyFunctionalBlock railgun in RailgunBlockList)
-            {
-                if (!railgun.Closed && railgun.IsFunctional) workingRailguns++;
-            }
-
-            _infoString.AppendLine($" -working: {workingRailguns} / {RailgunBlockList.Count}");
-
-            int chargedRailgunCounter = 0;
-            foreach (IMySmallMissileLauncherReload railgun in RailgunBlockList)
-            {
-                chargedRailgunCounter = CheckCounter(chargedRailgunCounter, railgun, _railGunChargeStateDetailedInfoString);
-            }
-
-            _infoString.AppendLine($" -charged: {chargedRailgunCounter} / {workingRailguns}");
-
-            _infoString.AppendLine($"Rotor position: {GetRotorAngle360(RotorBlockList.First())}");
-
-            if (DoorBlockList.Count > 0)
-            {
-                int workingDoors = 0;
-                foreach (IMyFunctionalBlock door in DoorBlockList)
-                {
-                    if (!door.Closed && door.IsFunctional) workingDoors++;
-                }
-
-                _infoString.Append($"Doors working: {workingDoors} / {DoorBlockList.Count}");
-            }
-            return _infoString;
-        }
-        double GetRotorAngle360(IMyMotorStator rotor)
-        {
-            if (rotor == null || rotor.Closed) return 0.0;
-
-            double degrees = MathHelper.ToDegrees(rotor.Angle);
-            return (degrees + 360) % 360;        // Converts to 0–360 range
-        }
-        #endregion Run
 
         private void Off()
         {
@@ -914,9 +381,7 @@ namespace IngameScript.Domain
 
             foreach (IMySmallMissileLauncherReload railgun in tempRailgunListOff)
             {
-                string detailString = railgun.DetailedInfo;
-
-                if (!detailString.Contains(_railGunChargeStateDetailedInfoString))
+                if (!RailgunLooksFullyCharged(railgun))
                 {
                     tempRailgunListOff.Remove(railgun);
                     break;
@@ -935,65 +400,6 @@ namespace IngameScript.Domain
             blockList.ForEach(rotor => ((IMyFunctionalBlock)rotor).Enabled = toggle);
         }
 
-
-
-        private void RailgunShootSalvo()
-        {
-
-            if (tempRailgunListShootSalvo.Count == 0)
-            {
-                tempRailgunListShootSalvo = new List<IMySmallMissileLauncherReload>(RailgunBlockList);
-            }
-
-            List<Plane> rotatedPlanes = getRotatedPlanes();
-
-            foreach (var railgun in tempRailgunListShootSalvo.ToList())
-            {
-                if (IsPointBetweenAngles(rotatedPlanes, railgun.GetPosition()))
-                {
-                    ShootRailgun(railgun);
-                    if (railgunReloadCheck == null)
-                    {
-                        railgunReloadCheck = railgun;
-                    }
-                }
-
-                if (!railgun.DetailedInfo.Contains(_railGunChargeStateDetailedInfoString))
-                {
-                    tempRailgunListShootSalvo.Remove(railgun);
-                }
-            }
-
-            if (tempRailgunListShootSalvo.Count == 0)
-            {
-                GAUState = GAUActionEnum.CHARGE;
-                ExhaustOff();
-            }
-        }
-
-        private void OpenDoors()
-        {
-            foreach (IMyDoor door in DoorBlockList)
-            {
-                door.OpenDoor();
-
-                if (_doorOpenRatio < door.OpenRatio)
-                {
-                    door.Enabled = false;
-                }
-            }
-        }
-
-        private void CloseDoors()
-        {
-            foreach (IMyDoor door in DoorBlockList)
-            {
-                door.Enabled = true;
-                door.CloseDoor();
-            }
-        }
-
-        #region Bools
 
         private bool IsBlockMissingInList<T>(List<T> blockList)
         {
@@ -1015,226 +421,5 @@ namespace IngameScript.Domain
             return block == null || block.Closed || block.IsFunctional != true;
         }
 
-        public bool IsPointBetweenAngles(List<Plane> rotatedPlanes, Vector3D railgunPosition)
-        {
-            float distanceToRotated = rotatedPlanes[0].SignedDistance(railgunPosition);
-            float distanceToRotated2 = rotatedPlanes[1].SignedDistance(railgunPosition);
-
-            return distanceToRotated2 > 0 && distanceToRotated < 0;
-        }
-        #endregion Bools
-
-        private static int CheckCounter(int chargeCounter, IMySmallMissileLauncherReload railgun, string railgunChargeState)
-        {
-            string detailString = railgun.DetailedInfo;
-
-            if (railgun.IsFunctional && detailString.Contains(railgunChargeState))
-            {
-                chargeCounter++;
-            }
-
-            return chargeCounter;
-        }
-
-        public Vector3D GetWorldPosition(Vector3I localPosition)
-        {
-            // Convert the grid coordinates to a local position in 3D space
-            Vector3D localCoords = (Vector3D)localPosition * GAUCenterBlock.CubeGrid.GridSize;
-
-            // Transform the local position to world coordinates using the grid's WorldMatrix
-            Vector3D worldCoords = Vector3D.Transform(localCoords, GAUCenterBlock.CubeGrid.WorldMatrix);
-
-            return worldCoords;
-        }
-
-        public static Vector3I TryParseVector3I(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s))
-                return new Vector3I();
-
-            var parts = s.Split(',');
-            if (parts.Length != 3)
-                return new Vector3I();
-
-            int x, y, z;
-
-            if (!int.TryParse(parts[0], out x)) return new Vector3I();
-            if (!int.TryParse(parts[1], out y)) return new Vector3I();
-            if (!int.TryParse(parts[2], out z)) return new Vector3I();
-
-            return new Vector3I(x, y, z);
-        }
-
-        public static String Vector3ItoString(Vector3I vector3I)
-        { 
-            return vector3I.X + ", " + vector3I.Y + ", " + vector3I.Z;
-        }
-            #endregion Gau Primary Methods
-
-            #region Exhaust Methods
-
-            public void TriggerExhaustEffect()
-        {
-            // === TURNING ON ===
-            if (_state < exhaustLists.Count)
-            {
-                if (_tickCounter >= _stepDelayTicks)
-                {
-                    exhaustLists[_state].ForEach(exhaust => exhaust.Enabled = true);
-                    _state++;
-                    _tickCounter = 0;
-                }
-                else
-                {
-                    _tickCounter++;
-                }
-            }
-        }
-
-        public void ExhaustOff()
-        {
-            // === TURNING OFF ===
-            exhaustLists.ForEach(exhaustList => exhaustList.ForEach(exhaust => exhaust.Enabled = false));
-        }
-
-        public void ExhaustReset()
-        {
-            _state = 0;
-            _tickCounter = 0;
-            _exhaustEffectDelay = (_stepDelayTicks + 1) * exhaustLists.Count;
-        }
-        #endregion Exhaust Methods
-
-        #endregion Gau Primary Methods
-
-        #region Plane
-
-        public class Plane
-        {
-            public Vector3 Normal { get; }
-            public float D { get; } // The plane equation is: Normal.X * x + Normal.Y * y + Normal.Z * z + D = 0
-
-            public Plane(Vector3D point1, Vector3D point2, Vector3D point3)
-            {
-                // Compute the normal vector using the cross product
-                Normal = Vector3D.Normalize(Vector3D.Cross(point2 - point1, point3 - point1));
-                // Calculate D for the plane equation
-                D = -Vector3.Dot(Normal, point1);
-            }
-
-            public float SignedDistance(Vector3D point)
-            {
-                // Calculate the signed distance of the point from the plane
-                return Vector3.Dot(Normal, point) + D;
-            }
-        }
-
-        public static class RotationHelper
-        {
-            // Rotate a vector around a given axis by an angle (in degrees)
-            public static Vector3D RotateVector(Vector3D vector, Vector3D axis, float angleDegrees)
-            {
-                float angleRadians = ((float)Math.PI) * angleDegrees / 180f;
-                Quaternion rotation = Quaternion.CreateFromAxisAngle(Vector3D.Normalize(axis), angleRadians);
-                return Vector3D.Transform(vector, rotation);
-            }
-        }
-
-        public List<Plane> getRotatedPlanes()
-        {
-            Vector3D center1 = GetWorldPosition(_circleCenter);
-            Vector3D center2 = GetWorldPosition(_circleCenter2);
-            Vector3D point = GetWorldPosition(_thridPoint);
-
-            // Create the axis of rotation
-            Vector3D rotationAxis = Vector3D.Normalize(center2 - center1);
-
-            // Rotate the third point around the axis by X degrees to find the rotated plane
-            Vector3D rotatedPoint = RotationHelper.RotateVector(point - center1, rotationAxis, _rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
-            Vector3D rotatedPoint2 = RotationHelper.RotateVector(point - center1, rotationAxis, -_rotationAngle + _targetAngle + _originPlaneAngleOffset) + center1;
-
-            return new List<Plane>
-            {
-                new Plane(center1, center2, rotatedPoint),
-                new Plane(center1, center2, rotatedPoint2)
-            };
-        }
-        #endregion Plane
-
-        #region ini
-
-        #region Static
-        public static void ParseIni(IMyTerminalBlock customDataProvider)
-        {
-            s_iniGeneral.Clear();
-            string customData = customDataProvider.CustomData;
-            bool parsed = s_iniGeneral.TryParse(customData);
-
-            string section = INI_SECTION_GENERAL;
-
-            if (!s_iniGeneral.ContainsSection(section))
-            {
-                s_iniGeneral.AddSection(section);
-            }
-
-
-            GAUGroupTag = s_iniGeneral.Get(section, INI_KEY_GENERAL_GAU_GROUP_TAG).ToString(GAUGroupTag);
-
-            s_iniGeneral.Set(section, INI_KEY_GENERAL_GAU_GROUP_TAG, GAUGroupTag);
-
-
-            string output = s_iniGeneral.ToString();
-            if (!string.Equals(output, customDataProvider.CustomData))
-            {
-                customDataProvider.CustomData = output;
-            }
-        }
-        #endregion Static
-
-        private void ParseIni()
-        {
-            s_iniGeneral.Clear();
-            string customData = _customDataProvider.CustomData;
-            bool parsed = s_iniGeneral.TryParse(customData);
-
-            string sectionName = IniSectionGAU;
-
-            if (!s_iniGeneral.ContainsSection(sectionName))
-            {
-                s_iniGeneral.AddSection(sectionName);
-            }
-
-            String referenceBlockGridCoords;
-
-            _rpm = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_RPM).ToDouble(_rpm);
-            _rotorName = s_iniGeneral.Get(sectionName, INI_KEY_GAU_MAIN_ROTOR_NAME).ToString(_rotorName);
-            _exhaustTag = s_iniGeneral.Get(sectionName, INI_KEY_GAU_EXHAUST_TAG).ToString(_exhaustTag);
-            _stepDelayTicks = s_iniGeneral.Get(sectionName, INI_KEY_GAU_STEP_DELAY_TICKS).ToInt32(_stepDelayTicks);
-            _targetAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_TARGET_ANGLE).ToDouble(_targetAngle);
-            _rotationAngle = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_ROTATION_ANGLE).ToDouble(_rotationAngle);
-            _doorOpenRatio = (float)s_iniGeneral.Get(sectionName, INI_KEY_GAU_DOOR_OPEN_RATIO).ToDouble(_doorOpenRatio);
-            referenceBlockGridCoords = s_iniGeneral.Get(sectionName, REFERENCE_BLOCK_GRID_COORDS).ToString(Vector3ItoString(_referenceBlockGridCoords));
-
-            // Get Reference block grid coords from CD
-            _referenceBlockGridCoords = TryParseVector3I(referenceBlockGridCoords);
-            
-
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_RPM, _rpm);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_MAIN_ROTOR_NAME, _rotorName);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_EXHAUST_TAG, _exhaustTag);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_STEP_DELAY_TICKS, _stepDelayTicks);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_TARGET_ANGLE, _targetAngle);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_ROTATION_ANGLE, _rotationAngle);
-            s_iniGeneral.Set(IniSectionGAU, INI_KEY_GAU_DOOR_OPEN_RATIO, _doorOpenRatio);
-            s_iniGeneral.Set(IniSectionGAU, REFERENCE_BLOCK_GRID_COORDS, referenceBlockGridCoords);
-
-            string output = s_iniGeneral.ToString();
-            _customDataProvider.CustomData = output;
-            if (!string.Equals(output, _customDataProvider.CustomData))
-            {
-                _customDataProvider.CustomData = output;
-            }
-        }
-        #endregion ini
     }
 }

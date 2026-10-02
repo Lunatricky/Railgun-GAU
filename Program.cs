@@ -13,7 +13,7 @@ namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        private List<GAU> _gauList = new List<GAU>();
+        private List<Gau> _gauList = new List<Gau>();
 
         // CommandLine Commands
         public const string CL_COMMAND_ON = "ON";
@@ -26,28 +26,30 @@ namespace IngameScript
         private IMyProgrammableBlock me;
 
         public string arg = "";
+
+        double maxRuntimeMs = 0;
+        int tickCounter = 0;
+
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             me = Me;
-            GAU.ParseIni(me); // Parse general settings
-            GAU.TryRegisterGridProgram(this); // enable runtime modification
-            _gauList = GAU.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
+            Gau.ParseIni(me); // Parse general settings
+            Gau.TryRegisterGridProgram(this); // enable runtime modification
+            _gauList = Gau.AcquireGAUs(me, GridTerminalSystem); // Each gau will create its own custom data section
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
             if (string.IsNullOrWhiteSpace(argument))
             {
-                foreach (GAU gau in _gauList)
+                foreach (Gau gau in _gauList)
                 {
                     gau.Run(me);
                     Echo(gau.Info.ToString());
-                    foreach(IMyTextSurface surface in gau.LcdBlockList)
-                    {
-                        surface.WriteText(gau.Info);
-                    }
+                    gau.PaintLcds();
                 }
+                Gau.TickCockpits(me, GridTerminalSystem, _gauList);
                 Echo(GetRuntimeInfo());
                 return;
             }
@@ -96,11 +98,11 @@ namespace IngameScript
 
             if (!string.IsNullOrWhiteSpace(groupName))
             {
-                GAU.RunWithTag(command, _gauList, groupName);
+                Gau.RunWithTag(command, _gauList, groupName);
             }
             else
             {
-                foreach (GAU gau in _gauList)
+                foreach (Gau gau in _gauList)
                 {
                     gau.Run(command);
                 }
@@ -110,8 +112,20 @@ namespace IngameScript
 
         private String GetRuntimeInfo()
         {
+            tickCounter++;
+
+            if (tickCounter % 20 == 1)
+            {
+                maxRuntimeMs = 0;
+            }
+
             StringBuilder m_echoBuilder = new StringBuilder(512);
             m_echoBuilder.Append($"Runtime: {Math.Round(Runtime.LastRunTimeMs, 5)} Ms\n");
+
+            double newRuntimeMs = Math.Round(Runtime.LastRunTimeMs, 5);
+            maxRuntimeMs = Math.Max(newRuntimeMs, maxRuntimeMs);
+
+            m_echoBuilder.Append($"Max Runtime: {maxRuntimeMs} Ms\n");
             m_echoBuilder.Append($"Instruction Count: {Runtime.CurrentInstructionCount}\n");
             m_echoBuilder.Append($"Complexity: {Math.Round((double)Runtime.CurrentInstructionCount / Runtime.MaxInstructionCount, 5)}%\n");
             return m_echoBuilder.ToString();
